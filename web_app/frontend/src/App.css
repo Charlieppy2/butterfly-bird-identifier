@@ -2497,3 +2497,222 @@
   }
 }
 
+/* ============================================
+   Species Detail Modal Styles
+   ============================================ */
+
+/* Clickable match card */
+.match-card.clickable {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.match-card.clickable:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3);
+  border-color: #4CAF50;
+}
+
+.match-card .click-hint {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 0.75rem;
+  color: #4CAF50;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.match-card.clickable:hover .click-hint {
+  opacity: 1;
+}
+
+/* Modal Overlay */
+.species-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal Container */
+.species-modal {
+  background: white;
+  border-radius: 20px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Close Button */
+.modal-close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.1);
+  color: #333;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.modal-close-btn:hover {
+  background: #f44336;
+  color: white;
+  transform: rotate(90deg);
+}
+
+/* Modal Content */
+.species-modal-content {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Species Image */
+.species-modal-image {
+  width: 100%;
+  height: 300px;
+  overflow: hidden;
+  border-radius: 20px 20px 0 0;
+}
+
+.species-modal-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Species Info */
+.species-modal-info {
+  padding: 25px 30px 30px;
+}
+
+.species-modal-info h2 {
+  font-size: 2rem;
+  color: #2E7D32;
+  margin-bottom: 5px;
+}
+
+.species-scientific-name {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.species-category-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 15px;
+}
+
+.species-category-badge.bird {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  color: #1565c0;
+}
+
+.species-category-badge.butterfly-moth {
+  background: linear-gradient(135deg, #fce4ec, #f8bbd9);
+  color: #c2185b;
+}
+
+.species-confidence {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  padding: 10px 15px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  color: #2E7D32;
+}
+
+/* Details Grid */
+.species-details-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.detail-item {
+  background: #f8f9fa;
+  padding: 15px 20px;
+  border-radius: 12px;
+  border-left: 4px solid #4CAF50;
+}
+
+.detail-item h4 {
+  font-size: 1rem;
+  color: #2E7D32;
+  margin-bottom: 8px;
+}
+
+.detail-item p {
+  font-size: 0.95rem;
+  color: #555;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .species-modal {
+    margin: 10px;
+    max-height: 95vh;
+  }
+
+  .species-modal-image {
+    height: 200px;
+  }
+
+  .species-modal-info {
+    padding: 20px;
+  }
+
+  .species-modal-info h2 {
+    font-size: 1.5rem;
+  }
+
+  .modal-close-btn {
+    top: 10px;
+    right: 10px;
+    width: 35px;
+    height: 35px;
+  }
+}
+

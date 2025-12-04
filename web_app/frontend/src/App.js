@@ -142,6 +142,10 @@ function App() {
   const [descriptionConversation, setDescriptionConversation] = useState([]);
   const [currentMatches, setCurrentMatches] = useState([]);
   
+  // Species Detail Modal State
+  const [selectedSpeciesDetail, setSelectedSpeciesDetail] = useState(null);
+  const [showSpeciesModal, setShowSpeciesModal] = useState(false);
+  
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -1171,6 +1175,18 @@ function App() {
     setDescriptionInput(question);
   };
 
+  // Handle clicking on a species card to view details
+  const handleSpeciesCardClick = (species) => {
+    setSelectedSpeciesDetail(species);
+    setShowSpeciesModal(true);
+  };
+
+  // Close species detail modal
+  const handleCloseSpeciesModal = () => {
+    setShowSpeciesModal(false);
+    setSelectedSpeciesDetail(null);
+  };
+
   return (
     <div className="App">
       <header className="App-header">
@@ -1286,7 +1302,12 @@ function App() {
                             <h4>🎯 Possible Matches:</h4>
                             <div className="matches-grid">
                               {msg.matches.slice(0, 3).map((match, idx) => (
-                                <div key={idx} className="match-card">
+                                <div 
+                                  key={idx} 
+                                  className="match-card clickable"
+                                  onClick={() => handleSpeciesCardClick(match)}
+                                  title="Click to view species details"
+                                >
                                   {match.image_path && (
                                     <img 
                                       src={`${API_URL}/api/species-image/${encodeURIComponent(match.image_path)}`}
@@ -1309,6 +1330,7 @@ function App() {
                                       <span>{(match.confidence_score * 100).toFixed(0)}% match</span>
                                     </div>
                                   </div>
+                                  <div className="click-hint">👆 Click for details</div>
                                 </div>
                               ))}
                             </div>
@@ -2494,6 +2516,83 @@ function App() {
       >
         ↑
       </button>
+
+      {/* Species Detail Modal */}
+      {showSpeciesModal && selectedSpeciesDetail && (
+        <div className="species-modal-overlay" onClick={handleCloseSpeciesModal}>
+          <div className="species-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-btn" onClick={handleCloseSpeciesModal}>×</button>
+            
+            <div className="species-modal-content">
+              {/* Species Image */}
+              {selectedSpeciesDetail.image_path && (
+                <div className="species-modal-image">
+                  <img 
+                    src={`${API_URL}/api/species-image/${encodeURIComponent(selectedSpeciesDetail.image_path)}`}
+                    alt={selectedSpeciesDetail.common_name}
+                    onError={(e) => { e.target.src = 'https://via.placeholder.com/400x300?text=No+Image'; }}
+                  />
+                </div>
+              )}
+              
+              {/* Species Info */}
+              <div className="species-modal-info">
+                <h2>{selectedSpeciesDetail.common_name}</h2>
+                <p className="species-scientific-name">
+                  <em>{selectedSpeciesDetail.scientific_name}</em>
+                </p>
+                
+                <span className={`species-category-badge ${selectedSpeciesDetail.category?.toLowerCase().replace('/', '-')}`}>
+                  {selectedSpeciesDetail.category}
+                </span>
+                
+                {selectedSpeciesDetail.confidence_score && (
+                  <div className="species-confidence">
+                    <strong>Match Confidence:</strong> {(selectedSpeciesDetail.confidence_score * 100).toFixed(0)}%
+                  </div>
+                )}
+                
+                <div className="species-details-grid">
+                  {selectedSpeciesDetail.description && (
+                    <div className="detail-item">
+                      <h4>📝 Description</h4>
+                      <p>{selectedSpeciesDetail.description}</p>
+                    </div>
+                  )}
+                  
+                  {selectedSpeciesDetail.habitat && (
+                    <div className="detail-item">
+                      <h4>🏠 Habitat</h4>
+                      <p>{selectedSpeciesDetail.habitat}</p>
+                    </div>
+                  )}
+                  
+                  {selectedSpeciesDetail.distribution && (
+                    <div className="detail-item">
+                      <h4>🌍 Distribution</h4>
+                      <p>{selectedSpeciesDetail.distribution}</p>
+                    </div>
+                  )}
+                  
+                  {selectedSpeciesDetail.size && (
+                    <div className="detail-item">
+                      <h4>📏 Size</h4>
+                      <p>{selectedSpeciesDetail.size}</p>
+                    </div>
+                  )}
+                  
+                  {selectedSpeciesDetail.behavior && (
+                    <div className="detail-item">
+                      <h4>🦅 Behavior</h4>
+                      <p>{selectedSpeciesDetail.behavior}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

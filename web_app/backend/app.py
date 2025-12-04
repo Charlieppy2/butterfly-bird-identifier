@@ -20,6 +20,14 @@ except ImportError:
     CV2_AVAILABLE = False
     print("Warning: OpenCV not available. Some quality analysis features may be limited.")
 
+# Import semantic matcher for description-based identification
+try:
+    from semantic_matcher import identify_species_semantic, initialize as init_semantic_matcher
+    SEMANTIC_MATCHER_AVAILABLE = True
+except ImportError:
+    SEMANTIC_MATCHER_AVAILABLE = False
+    print("Warning: Semantic matcher not available. Using keyword matching.")
+
 app = Flask(__name__)
 # Configure CORS to allow all origins (for mobile and web access)
 CORS(app, resources={
@@ -1334,8 +1342,71 @@ def calculate_match_score(description, species_info):
 def identify_by_description(description, category=None, conversation_history=None):
     """
     Identify species based on text description.
+    Uses semantic matching (if available) or falls back to keyword matching.
     Returns matches and follow-up questions if needed.
     """
+    
+    # Try semantic matching first (more accurate)
+    if SEMANTIC_MATCHER_AVAILABLE:
+        try:
+            semantic_result = identify_species_semantic(description, category, conversation_history)
+            if semantic_result is not None:
+                # Convert semantic results to standard format
+                species_db = load_species_database()
+                formatted_matches = []
+                
+                for match in semantic_result.get('matches', []):
+                    species_key = match.get('species_key', '')
+                    species_info = match.get('species_info', {})
+                    
+                    # Get full species info from database
+                    full_info = None
+                    species_type = species_info.get('type', 'unknown')
+                    
+                    # STRICT CATEGORY FILTERING - Skip if category doesn't match
+                    if category:
+                        if category.lower() in ['bird', 'birds'] and species_type != 'bird':
+                            continue  # Skip non-birds when user wants birds
+                        if category.lower() in ['butterfly', 'butterflies'] and species_type != 'butterfly':
+                            continue  # Skip non-butterflies when user wants butterflies
+                    
+                    if species_type == 'bird':
+                        full_info = species_db.get('birds', {}).get(species_key)
+                    elif species_type == 'butterfly':
+                        full_info = species_db.get('butterflies', {}).get(species_key)
+                    
+                    if not full_info:
+                        # Try both databases
+                        full_info = species_db.get('birds', {}).get(species_key) or \
+                                   species_db.get('butterflies', {}).get(species_key)
+                    
+                    if full_info:
+                        formatted_matches.append({
+                            'common_name': full_info.get('common_name', species_key),
+                            'scientific_name': full_info.get('scientific_name', ''),
+                            'description': full_info.get('description', ''),
+                            'habitat': full_info.get('habitat', ''),
+                            'distribution': full_info.get('distribution', ''),
+                            'behavior': full_info.get('behavior', ''),
+                            'size': full_info.get('size', full_info.get('wingspan', '')),
+                            'category': 'Bird' if species_type == 'bird' else 'Butterfly/Moth',
+                            'confidence_score': match.get('confidence', 0.5),
+                            'image_path': full_info.get('image_path', ''),
+                            'matched_fields': ['semantic_match'],
+                            'match_method': 'semantic'
+                        })
+                
+                return {
+                    'matches': formatted_matches,
+                    'needs_clarification': semantic_result.get('needs_more_info', False),
+                    'follow_up_questions': semantic_result.get('follow_up_questions', [])[:3],
+                    'total_searched': 300,  # Total species count
+                    'match_method': 'semantic'
+                }
+        except Exception as e:
+            print(f"Semantic matching failed, falling back to keyword: {e}")
+    
+    # Fallback to keyword matching
     species_db = load_species_database()
     
     # Determine which categories to search
@@ -1427,14 +1498,16 @@ def identify_by_description(description, category=None, conversation_history=Non
             'category': 'Bird' if match['category'] == 'birds' else 'Butterfly/Moth',
             'confidence_score': min(match['score'] / 10, 1.0),  # Normalize to 0-1
             'image_path': info.get('image_path', ''),
-            'matched_fields': match['matched_fields']
+            'matched_fields': match['matched_fields'],
+            'match_method': 'keyword'
         })
     
     return {
         'matches': formatted_matches,
         'needs_clarification': needs_clarification,
         'follow_up_questions': follow_up_questions[:3] if follow_up_questions else [],
-        'total_searched': sum(len(species_db.get(cat, {})) for cat in categories_to_search)
+        'total_searched': sum(len(species_db.get(cat, {})) for cat in categories_to_search),
+        'match_method': 'keyword'
     }
 
 
@@ -1504,13 +1577,13 @@ def identify_species_by_description():
 def description_chat():
     """
     Interactive chat for species identification by description.
-    Maintains conversation context for follow-up questions.
+    Maintains conversation context and progressively narrows down matches.
     """
     try:
         data = request.get_json()
         message = data.get('message', '').strip()
         conversation_history = data.get('conversation_history', [])
-        current_matches = data.get('current_matches', [])
+        current_matches = data.get('current_matches', [])  # Previous matches to narrow down
         category = data.get('category', None)
         
         if not message:
@@ -1527,19 +1600,97 @@ def description_chat():
         ])
         full_description += ' ' + message
         
+        # Detect category from conversation if not explicitly set
+        detected_category = category
+        if not detected_category:
+            # Check if user mentioned bird or butterfly in any message
+            full_text_lower = full_description.lower()
+            if 'bird' in full_text_lower and 'butterfly' not in full_text_lower:
+                detected_category = 'bird'
+            elif 'butterfly' in full_text_lower and 'bird' not in full_text_lower:
+                detected_category = 'butterfly'
+            elif 'moth' in full_text_lower:
+                detected_category = 'butterfly'
+        
+        # If we have previous matches, extract the category from them
+        inferred_category = None
+        if current_matches and len(current_matches) > 0:
+            # Get categories from previous matches
+            prev_categories = set()
+            for m in current_matches:
+                cat = m.get('category', '')
+                if 'Bird' in cat:
+                    prev_categories.add('bird')
+                elif 'Butterfly' in cat or 'Moth' in cat:
+                    prev_categories.add('butterfly')
+            
+            # If all previous matches were one category, stick with it
+            if len(prev_categories) == 1:
+                inferred_category = list(prev_categories)[0]
+        
+        # Use inferred category if no explicit category and we have previous context
+        effective_category = detected_category or inferred_category
+        
         # Perform identification with accumulated description
-        result = identify_by_description(full_description, category, conversation_history)
+        result = identify_by_description(full_description, effective_category, conversation_history)
+        
+        # If we have previous matches, narrow down to those that still match
+        if current_matches and len(current_matches) > 0:
+            previous_names = set(m.get('common_name', '').lower() for m in current_matches)
+            
+            # Also get the category of previous matches for strict filtering
+            prev_category_type = None
+            if inferred_category:
+                prev_category_type = inferred_category
+            
+            # Filter new results to prioritize species from previous matches
+            refined_matches = []
+            same_category_matches = []
+            
+            for match in result['matches']:
+                match_name = match.get('common_name', '').lower()
+                match_category = match.get('category', '')
+                
+                # Check if it's the same category as previous matches
+                is_same_category = False
+                if prev_category_type == 'bird' and 'Bird' in match_category:
+                    is_same_category = True
+                elif prev_category_type == 'butterfly' and ('Butterfly' in match_category or 'Moth' in match_category):
+                    is_same_category = True
+                
+                if match_name in previous_names:
+                    # This species was in previous results - highest priority
+                    refined_matches.append(match)
+                elif is_same_category:
+                    # Same category but different species - second priority
+                    same_category_matches.append(match)
+            
+            # Use refined matches if available, otherwise same-category matches
+            if refined_matches:
+                result['matches'] = refined_matches
+                result['narrowed_down'] = True
+            elif same_category_matches:
+                # No exact overlap, but stay within the same category
+                result['matches'] = same_category_matches[:5]
+                result['narrowed_down'] = False
+                result['stayed_in_category'] = True
+            # If neither, keep the original results (category might have changed)
         
         # Generate appropriate response
         if result['matches']:
             top_match = result['matches'][0]
+            num_matches = len(result['matches'])
             
-            if len(result['matches']) == 1 or (
-                len(result['matches']) >= 2 and 
+            # Check if we've narrowed down significantly
+            was_narrowed = result.get('narrowed_down', False)
+            
+            if num_matches == 1 or (
+                num_matches >= 2 and 
                 result['matches'][0]['confidence_score'] > result['matches'][1]['confidence_score'] * 1.5
             ):
                 # High confidence single match
-                response_text = f"""Based on all the information you've provided, I believe this is most likely:
+                confidence_pct = int(top_match['confidence_score'] * 100)
+                response_text = f"""🎯 Based on all the information you've provided, I'm {confidence_pct}% confident this is:
 
 **{top_match['common_name']}** ({top_match['scientific_name']})
 
@@ -1549,16 +1700,36 @@ def description_chat():
 **Habitat:** {top_match['habitat']}
 **Distribution:** {top_match['distribution']}
 
-Would you like more information about this species?"""
+Is this the species you were looking for? If not, please tell me what's different."""
                 needs_more_info = False
+            elif num_matches <= 3:
+                # Few candidates left - getting closer!
+                if was_narrowed:
+                    response_text = f"✨ Great! I've narrowed it down to {num_matches} possibilities:\n\n"
+                else:
+                    response_text = f"I found {num_matches} possible matches:\n\n"
+                
+                for i, match in enumerate(result['matches'][:3], 1):
+                    conf = int(match['confidence_score'] * 100)
+                    response_text += f"{i}. **{match['common_name']}** ({match['category']}) - {conf}% match\n"
+                    response_text += f"   _{match['description'][:80]}..._\n\n"
+                
+                if result.get('follow_up_questions'):
+                    response_text += f"\n💡 To help me narrow it down further: {result['follow_up_questions'][0]}"
+                needs_more_info = True
             else:
                 # Multiple possible matches
-                response_text = f"I've narrowed it down to {len(result['matches'])} possibilities:\n\n"
-                for i, match in enumerate(result['matches'][:3], 1):
-                    response_text += f"{i}. **{match['common_name']}** ({match['category']})\n"
+                if was_narrowed:
+                    response_text = f"📋 Narrowed down from previous results. Still have {num_matches} possibilities:\n\n"
+                else:
+                    response_text = f"📋 I found {num_matches} possible matches:\n\n"
                 
-                if result['follow_up_questions']:
-                    response_text += f"\nTo help me identify it more precisely: {result['follow_up_questions'][0]}"
+                for i, match in enumerate(result['matches'][:3], 1):
+                    conf = int(match['confidence_score'] * 100)
+                    response_text += f"{i}. **{match['common_name']}** ({match['category']}) - {conf}% match\n"
+                
+                if result.get('follow_up_questions'):
+                    response_text += f"\n💡 To help me identify it more precisely: {result['follow_up_questions'][0]}"
                 needs_more_info = True
         else:
             response_text = """I'm having trouble finding a match. Could you describe:
