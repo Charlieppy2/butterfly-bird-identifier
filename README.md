@@ -125,17 +125,35 @@ cd butterfly-bird-identifier
 
 #### 2. Install Backend Dependencies
 
+**Windows (PowerShell):**
+```powershell
+cd web_app/backend
+pip install -r requirements.txt
+```
+
+**Linux/Mac:**
 ```bash
 cd web_app/backend
 pip install -r requirements.txt
 ```
 
+**Note:** First-time installation may take 2-5 minutes, especially for TensorFlow.
+
 #### 3. Install Frontend Dependencies
 
-```bash
-cd ../frontend
+**Windows (PowerShell):**
+```powershell
+cd web_app/frontend
 npm install
 ```
+
+**Linux/Mac:**
+```bash
+cd web_app/frontend
+npm install
+```
+
+**Note:** First-time installation may take 2-5 minutes and install ~1344 packages.
 
 ### Launch Application
 
@@ -143,6 +161,13 @@ npm install
 
 **Start Backend Service:**
 
+**Windows (PowerShell):**
+```powershell
+cd web_app/backend
+python app.py
+```
+
+**Linux/Mac:**
 ```bash
 cd web_app/backend
 python app.py
@@ -150,30 +175,66 @@ python app.py
 
 Backend service will start at `http://localhost:5000`
 
+You should see:
+```
+Loading model...
+Model loaded successfully from ...
+Starting Flask server...
+Running on http://0.0.0.0:5000
+```
+
 **Start Frontend Application:**
 
-Open a new terminal window:
+Open a **new terminal window**:
 
+**Windows (PowerShell):**
+```powershell
+cd web_app/frontend
+npm start
+```
+
+**Linux/Mac:**
 ```bash
 cd web_app/frontend
 npm start
 ```
 
-Frontend application will start at `http://localhost:3000`, browser will open automatically.
+Frontend application will start at `http://localhost:3000`, browser will open automatically after compilation (10-30 seconds).
 
 #### Method 2: Using Batch Files (Windows)
 
 **Backend:**
-```bash
+Double-click `web_app\backend\start_backend.bat` or run:
+```powershell
 cd web_app/backend
-start_backend.bat
+.\start_backend.bat
 ```
 
 **Frontend:**
-```bash
+Double-click `web_app\frontend\start_frontend.bat` or run:
+```powershell
 cd web_app/frontend
-start_frontend.bat
+.\start_frontend.bat
 ```
+
+### Verify Services
+
+**Check Backend:**
+Open browser and visit: `http://localhost:5000`
+
+You should see:
+```json
+{
+  "status": "success",
+  "message": "HK Urban Ecological Identification API is running",
+  "model_loaded": true
+}
+```
+
+**Check Frontend:**
+Open browser and visit: `http://localhost:3000`
+
+You should see the main application interface with upload area and buttons.
 
 ## 📖 User Guide
 
@@ -308,20 +369,73 @@ python train_assistant.py
 
 ## 🛠️ Development Environment
 
-- Python 3.8+
-- Node.js 16+
-- TensorFlow 2.15.0+
-- React 18.2.0
-- Flask 3.0.0
-- OpenCV 4.8.0+
+- **Python**: 3.8+ (tested with 3.13.9)
+- **Node.js**: 16+ (tested with 24.11.1)
+- **TensorFlow**: 2.16.0+ (tested with 2.20.0)
+- **React**: 18.2.0
+- **Flask**: 3.0.0
+- **Flask-CORS**: 4.0.0
+- **OpenCV**: 4.8.0+ (tested with 4.12.0.88)
+- **Pillow**: 10.1.0+
+- **NumPy**: 1.24.3+
 
 ## ⚠️ Notes
 
 1. **Git LFS**: Model files use Git LFS storage, need to run `git lfs install` after cloning
-2. **First Run**: First run needs to load model, may take some time
+2. **First Run**: First run needs to load model, may take some time (10-30 seconds)
 3. **GPU Acceleration**: Training model recommended to use GPU acceleration (Google Colab recommended)
 4. **Disk Space**: Ensure sufficient disk space for dataset and model storage (model ~19MB)
 5. **Browser Compatibility**: Recommended to use latest versions of Chrome, Firefox, or Edge
+6. **Port Conflicts**: If ports 5000 or 3000 are already in use, stop the conflicting services or change ports in configuration
+7. **Windows PowerShell**: Use `;` instead of `&&` for chaining commands in PowerShell
+8. **Keep Terminals Open**: Both backend and frontend services must remain running - keep terminal windows open
+
+## ❓ Troubleshooting
+
+### Backend Won't Start
+
+**Problem**: "Model not found" or "Model not loaded"
+
+**Solution**:
+1. Verify model file exists: `models/trained/model.h5`
+2. Verify class names file exists: `models/trained/class_names.json`
+3. If files don't exist, you need to train the model first (see Model Training section)
+
+### Frontend Can't Connect to Backend
+
+**Problem**: "Cannot connect to website" or "Connection refused"
+
+**Solution**:
+1. Verify backend service is running (check http://localhost:5000)
+2. Ensure both services are running simultaneously
+3. Try clearing browser cache and refreshing
+4. Check firewall settings
+
+### Frontend Compilation Errors
+
+**Problem**: Errors when running `npm start`
+
+**Solution**:
+1. Delete `node_modules` folder
+2. Delete `package-lock.json` file
+3. Run `npm install` again
+4. Run `npm start` again
+
+### Port Already in Use
+
+**Problem**: Port 5000 or 3000 is already in use
+
+**Solution**:
+1. Close other programs using these ports
+2. Or modify port in `app.py` (backend) or set `PORT=3001` environment variable (frontend)
+
+### Installation Takes Too Long
+
+**Solution**:
+- This is normal for first-time installation
+- Backend dependencies (especially TensorFlow) may take 5-10 minutes
+- Frontend dependencies may take 2-5 minutes
+- Ensure stable internet connection
 
 ## 📝 Changelog
 
@@ -333,6 +447,7 @@ python train_assistant.py
 - ✨ Added batch identification mode
 - 🐛 Fixed category distribution issue (butterflies correctly classified)
 - 📦 Using Git LFS for large file management
+- 📝 Updated installation and setup documentation
 
 ## 📚 References
 
