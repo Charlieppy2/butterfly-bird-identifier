@@ -13,9 +13,18 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 安裝 Git LFS
+# 先安裝必要的依賴（gnupg 在新版 Debian 中可能需要）
+RUN apt-get update && apt-get install -y \
+    gnupg2 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安裝 Git LFS（使用官方方法）
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
+    apt-get update && \
     apt-get install -y git-lfs && \
-    git lfs install
+    git lfs install && \
+    rm -rf /var/lib/apt/lists/*
 
 # 先複製 requirements.txt
 COPY web_app/backend/requirements.txt /app/requirements.txt
