@@ -46,7 +46,7 @@ const getApiUrl = () => {
       console.error('💡 Example: https://your-backend-app.koyeb.app');
       // 返回默认的后端 URL（如果后端部署在 Koyeb）
       // 注意：这个 URL 需要根据实际部署情况更新，建议通过环境变量设置
-      return 'https://very-ninnetta-hk-urban-butterfly-bird-id-62357094.koyeb.app';
+      return 'https://butterfly-bird-id.koyeb.app';
     }
     
     // 其他情况（生产环境域名，但不是 Vercel）
