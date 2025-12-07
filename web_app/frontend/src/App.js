@@ -207,6 +207,7 @@ function App() {
           image: URL.createObjectURL(file),
           prediction: response.data.prediction,
           quality: response.data.quality_analysis,
+          warning: response.data.warning, // 保存警告信息
           timestamp: new Date().toLocaleString('en-US', {
             year: 'numeric',
             month: '2-digit',
@@ -1882,6 +1883,15 @@ function App() {
                           <p className="batch-filename">{result.filename}</p>
                           {result.error ? (
                             <p className="batch-error">⚠️ {result.error}</p>
+                          ) : result.warning ? (
+                            <>
+                              <p className="batch-class" style={{ color: '#FF9800', fontStyle: 'italic' }}>
+                                ⚠️ Not a butterfly or bird
+                              </p>
+                              <p className="batch-confidence">
+                                {(result.prediction.confidence * 100).toFixed(1)}%
+                              </p>
+                            </>
                           ) : (
                             <>
                               <p className="batch-class">{result.prediction.class}</p>
@@ -2237,7 +2247,13 @@ function App() {
                         Image not available
                       </div>
                       <div className="history-info">
-                        <p className="history-class">{item.prediction.class}</p>
+                        {item.warning ? (
+                          <p className="history-class" style={{ color: '#FF9800', fontStyle: 'italic' }}>
+                            ⚠️ Not a butterfly or bird
+                          </p>
+                        ) : (
+                          <p className="history-class">{item.prediction.class}</p>
+                        )}
                         <p className="history-confidence">
                           {(item.prediction.confidence * 100).toFixed(2)}% confidence
                         </p>
@@ -2479,7 +2495,13 @@ function App() {
                 <div key={item.id} className="history-item">
                   <img src={item.image} alt="History" />
                   <div className="history-info">
-                    <p className="history-class">{item.prediction.class}</p>
+                    {item.warning ? (
+                      <p className="history-class" style={{ color: '#FF9800', fontStyle: 'italic' }}>
+                        ⚠️ Not a butterfly or bird
+                      </p>
+                    ) : (
+                      <p className="history-class">{item.prediction.class}</p>
+                    )}
                     <p className="history-confidence">
                       {(item.prediction.confidence * 100).toFixed(1)}%
                     </p>
