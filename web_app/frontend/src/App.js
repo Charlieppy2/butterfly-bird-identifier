@@ -1210,7 +1210,7 @@ function App() {
             className={`nav-btn ${!showBirdsPage && !showButterfliesPage && !showDescriptionMode ? 'active' : ''}`}
             onClick={() => { handleShowMain(); setShowDescriptionMode(false); }}
           >
-            🏠 Home
+            🔍 Identify
           </button>
           <button 
             className={`nav-btn ${showDescriptionMode ? 'active' : ''}`}
