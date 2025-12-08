@@ -1612,6 +1612,8 @@ def identify_by_description(description, category=None, conversation_history=Non
                     
                     if full_info:
                         formatted_matches.append({
+                            'key': species_key,  # Add key for collection feature
+                            'species_id': species_key,  # Also add as species_id for compatibility
                             'common_name': full_info.get('common_name', species_key),
                             'scientific_name': full_info.get('scientific_name', ''),
                             'description': full_info.get('description', ''),
@@ -1717,8 +1719,11 @@ def identify_by_description(description, category=None, conversation_history=Non
     formatted_matches = []
     for match in top_matches:
         info = match['species_info']
+        species_key = match['species_key']
         formatted_matches.append({
-            'common_name': info.get('common_name', match['species_key']),
+            'key': species_key,  # Add key for collection feature
+            'species_id': species_key,  # Also add as species_id for compatibility
+            'common_name': info.get('common_name', species_key),
             'scientific_name': info.get('scientific_name', ''),
             'description': info.get('description', ''),
             'habitat': info.get('habitat', ''),

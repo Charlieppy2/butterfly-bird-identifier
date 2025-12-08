@@ -300,10 +300,19 @@ function App() {
       
       // Add to collection if prediction is successful
       if (response.data.prediction && response.data.prediction.class) {
-        const speciesId = getSpeciesId(response.data.prediction);
+        let speciesId = getSpeciesId(response.data.prediction);
         const speciesName = response.data.prediction.class;
+        
+        // If class is in format "001.Black_footed_Albatross" or "ADONIS", use it directly
+        if (!speciesId && response.data.prediction.class) {
+          speciesId = response.data.prediction.class;
+        }
+        
         if (speciesId) {
+          console.log('📚 Adding prediction to collection:', { speciesId, speciesName, prediction: response.data.prediction });
           addToCollection(speciesId, speciesName);
+        } else {
+          console.warn('⚠️ Could not get species ID from prediction:', response.data.prediction);
         }
       }
       
@@ -1288,10 +1297,23 @@ function App() {
         // Add top match to collection if available
         if (response.data.matches && response.data.matches.length > 0) {
           const topMatch = response.data.matches[0];
-          const speciesId = getSpeciesId(topMatch);
-          const speciesName = topMatch.common_name || topMatch.class;
+          // Try to get species key from match - it might be in different fields
+          let speciesId = getSpeciesId(topMatch);
+          
+          // If no ID found, try to extract from image_path
+          if (!speciesId && topMatch.image_path) {
+            const pathParts = topMatch.image_path.split('/');
+            if (pathParts.length >= 3 && pathParts[1] === 'raw') {
+              speciesId = pathParts[2]; // e.g., "001.Black_footed_Albatross"
+            }
+          }
+          
+          const speciesName = topMatch.common_name || topMatch.class || 'Unknown';
           if (speciesId) {
+            console.log('📚 Adding match to collection:', { speciesId, speciesName, topMatch });
             addToCollection(speciesId, speciesName);
+          } else {
+            console.warn('⚠️ Could not get species ID from match:', topMatch);
           }
         }
       } else {
@@ -1380,25 +1402,28 @@ function App() {
   const getSpeciesId = (predictionOrMatch, objectKey = null) => {
     // If objectKey is provided (from Object.keys()), use it directly
     if (objectKey) {
-      // objectKey is like "001.Black_footed_Albatross"
+      // objectKey is like "001.Black_footed_Albatross" or "ADONIS"
       return objectKey;
     }
     
-    // Try different possible ID fields
+    // Try different possible ID fields (priority order)
     if (predictionOrMatch.species_id) return predictionOrMatch.species_id;
     if (predictionOrMatch.key) return predictionOrMatch.key;
     if (predictionOrMatch.class) {
-      // Use class name as ID (e.g., "001.Black_footed_Albatross")
+      // Use class name as ID
+      // Birds: "001.Black_footed_Albatross"
+      // Butterflies: "ADONIS", "MONARCH", etc.
       return predictionOrMatch.class;
     }
     
     // Extract ID from image_path if available
-    // image_path format: "data/raw/001.Black_footed_Albatross/..."
+    // image_path format: "data/raw/001.Black_footed_Albatross/..." or "data/raw/ADONIS/..."
     if (predictionOrMatch.image_path) {
       const pathParts = predictionOrMatch.image_path.split('/');
       if (pathParts.length >= 3 && pathParts[1] === 'raw') {
         const speciesKey = pathParts[2];
-        if (speciesKey && speciesKey.match(/^\d{3}\./)) {
+        // Accept both formats: "001.Black_footed_Albatross" (birds) and "ADONIS" (butterflies)
+        if (speciesKey) {
           return speciesKey;
         }
       }
@@ -2105,22 +2130,9 @@ function App() {
             
             <div className="collection-tabs">
               <button 
-                className={`collection-tab ${descriptionCategory === 'all' ? 'active' : ''}`}
-                onClick={() => setDescriptionCategory('all')}
+                className="collection-tab active"
               >
                 All Species
-              </button>
-              <button 
-                className={`collection-tab ${descriptionCategory === 'bird' ? 'active' : ''}`}
-                onClick={() => setDescriptionCategory('bird')}
-              >
-                Birds Only
-              </button>
-              <button 
-                className={`collection-tab ${descriptionCategory === 'butterfly' ? 'active' : ''}`}
-                onClick={() => setDescriptionCategory('butterfly')}
-              >
-                Butterflies Only
               </button>
             </div>
 
@@ -2128,14 +2140,8 @@ function App() {
               {/* Load and display all species */}
               {(() => {
                 const allSpecies = [...birdsData, ...butterfliesData];
-                const filteredSpecies = allSpecies.filter(species => {
-                  if (descriptionCategory === 'bird') {
-                    return species.category === 'Bird' || species.type === 'bird';
-                  } else if (descriptionCategory === 'butterfly') {
-                    return species.category === 'Butterfly/Moth' || species.type === 'butterfly';
-                  }
-                  return true;
-                });
+                // Show all species (no filtering by category)
+                let filteredSpecies = allSpecies;
 
                 // Sort: collected species first, then uncollected
                 const sortedSpecies = filteredSpecies.sort((a, b) => {
@@ -2153,6 +2159,7 @@ function App() {
                   const bName = b.common_name || '';
                   return aName.localeCompare(bName);
                 });
+
 
                 return sortedSpecies.map((species, idx) => {
                   const speciesId = getSpeciesId(species);
