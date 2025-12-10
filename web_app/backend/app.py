@@ -2066,6 +2066,236 @@ def calculate_match_score(description, species_info):
                 except ValueError:
                     pass
     
+    # Extract wingspan from user description (e.g., "wingspan: 22cm" -> 22)
+    user_wingspan = None
+    wingspan_patterns = [
+        r'wingspan\s*:?\s*(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)',
+        r'(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)\s*(?:wingspan|in wingspan)',
+        r'wingspan\s+of\s+(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)'
+    ]
+    for pattern in wingspan_patterns:
+        match = re.search(pattern, description_lower)
+        if match:
+            try:
+                user_wingspan = float(match.group(1))
+                break
+            except ValueError:
+                pass
+    
+    # If user specified a wingspan, check if it matches the species size
+    if user_wingspan is not None:
+        size_text = str(species_info.get('size', species_info.get('wingspan', ''))).lower()
+        # Extract wingspan range from species size (e.g., "Wingspan: 17-20 cm" -> 17, 20)
+        wingspan_range_match = re.search(r'wingspan\s*:?\s*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)', size_text)
+        if wingspan_range_match:
+            try:
+                min_wingspan = float(wingspan_range_match.group(1))
+                max_wingspan = float(wingspan_range_match.group(2))
+                
+                # First check if user wingspan is within the range
+                if min_wingspan <= user_wingspan <= max_wingspan:
+                    # User wingspan is within range - give high score boost
+                    score += 50
+                else:
+                    # User wingspan is outside range - calculate how far off
+                    if user_wingspan < min_wingspan:
+                        # User wingspan is smaller than minimum
+                        diff = min_wingspan - user_wingspan
+                        diff_percent = diff / min_wingspan if min_wingspan > 0 else 1
+                    else:
+                        # User wingspan is larger than maximum
+                        diff = user_wingspan - max_wingspan
+                        diff_percent = diff / max_wingspan if max_wingspan > 0 else 1
+                    
+                    # If user wingspan is outside range, filter out unless very close (within 5%)
+                    if diff_percent > 0.05:
+                        # Return negative score to filter out this match
+                        return -100, []
+                    # If very close to range (within 5%), slightly reduce score
+                    else:
+                        score -= 10
+            except (ValueError, IndexError):
+                pass
+        else:
+            # Try to extract single wingspan value
+            single_wingspan_match = re.search(r'wingspan\s*:?\s*(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)', size_text)
+            if single_wingspan_match:
+                try:
+                    species_wingspan = float(single_wingspan_match.group(1))
+                    # For single wingspan value, allow some tolerance (±5%)
+                    tolerance = species_wingspan * 0.05
+                    if abs(user_wingspan - species_wingspan) <= tolerance:
+                        # Within tolerance - give high score boost
+                        score += 50
+                    else:
+                        # Outside tolerance - calculate difference
+                        diff_percent = abs(user_wingspan - species_wingspan) / species_wingspan if species_wingspan > 0 else 1
+                        # If difference is more than 5%, filter out
+                        if diff_percent > 0.05:
+                            return -100, []
+                        # If very close (within 5%), slightly reduce score
+                        else:
+                            score -= 10
+                except ValueError:
+                    pass
+    
+    # Extract weight from user description (e.g., "weight: 140g" -> 140)
+    user_weight = None
+    weight_patterns = [
+        r'weight\s*:?\s*(\d+(?:\.\d+)?)\s*(?:g|gram|grams|kg|kilogram|kilograms)',
+        r'(\d+(?:\.\d+)?)\s*(?:g|gram|grams|kg|kilogram|kilograms)\s*(?:weight|in weight)',
+        r'weight\s+of\s+(\d+(?:\.\d+)?)\s*(?:g|gram|grams|kg|kilogram|kilograms)'
+    ]
+    for pattern in weight_patterns:
+        match = re.search(pattern, description_lower)
+        if match:
+            try:
+                user_weight = float(match.group(1))
+                # Convert kg to g if needed
+                if 'kg' in match.group(0).lower() or 'kilogram' in match.group(0).lower():
+                    user_weight = user_weight * 1000
+                break
+            except ValueError:
+                pass
+    
+    # If user specified a weight, check if it matches the species size
+    if user_weight is not None:
+        size_text = str(species_info.get('size', species_info.get('wingspan', ''))).lower()
+        # Extract weight range from species size (e.g., "Weight: 195-330 g" -> 195, 330)
+        weight_range_match = re.search(r'weight\s*:?\s*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:g|gram|grams|kg|kilogram|kilograms)', size_text)
+        if weight_range_match:
+            try:
+                min_weight = float(weight_range_match.group(1))
+                max_weight = float(weight_range_match.group(2))
+                # Convert kg to g if needed
+                if 'kg' in weight_range_match.group(0).lower() or 'kilogram' in weight_range_match.group(0).lower():
+                    min_weight = min_weight * 1000
+                    max_weight = max_weight * 1000
+                
+                # First check if user weight is within the range
+                if min_weight <= user_weight <= max_weight:
+                    # User weight is within range - give high score boost
+                    score += 50
+                else:
+                    # User weight is outside range - calculate how far off
+                    if user_weight < min_weight:
+                        # User weight is smaller than minimum
+                        diff = min_weight - user_weight
+                        diff_percent = diff / min_weight if min_weight > 0 else 1
+                    else:
+                        # User weight is larger than maximum
+                        diff = user_weight - max_weight
+                        diff_percent = diff / max_weight if max_weight > 0 else 1
+                    
+                    # If user weight is outside range, filter out unless very close (within 5%)
+                    if diff_percent > 0.05:
+                        # Return negative score to filter out this match
+                        return -100, []
+                    # If very close to range (within 5%), slightly reduce score
+                    else:
+                        score -= 10
+            except (ValueError, IndexError):
+                pass
+        else:
+            # Try to extract single weight value
+            single_weight_match = re.search(r'weight\s*:?\s*(\d+(?:\.\d+)?)\s*(?:g|gram|grams|kg|kilogram|kilograms)', size_text)
+            if single_weight_match:
+                try:
+                    species_weight = float(single_weight_match.group(1))
+                    # Convert kg to g if needed
+                    if 'kg' in single_weight_match.group(0).lower() or 'kilogram' in single_weight_match.group(0).lower():
+                        species_weight = species_weight * 1000
+                    # For single weight value, allow some tolerance (±5%)
+                    tolerance = species_weight * 0.05
+                    if abs(user_weight - species_weight) <= tolerance:
+                        # Within tolerance - give high score boost
+                        score += 50
+                    else:
+                        # Outside tolerance - calculate difference
+                        diff_percent = abs(user_weight - species_weight) / species_weight if species_weight > 0 else 1
+                        # If difference is more than 5%, filter out
+                        if diff_percent > 0.05:
+                            return -100, []
+                        # If very close (within 5%), slightly reduce score
+                        else:
+                            score -= 10
+                except ValueError:
+                    pass
+    
+    # Extract generic size from user description (e.g., "size:3cm" -> 3)
+    # Only process if user hasn't already specified length, wingspan, or weight
+    user_size = None
+    if user_length is None and user_wingspan is None and user_weight is None:
+        size_patterns = [
+            r'size\s*:?\s*(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)',
+            r'(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)\s*(?:size|in size)',
+            r'size\s+of\s+(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)'
+        ]
+        for pattern in size_patterns:
+            match = re.search(pattern, description_lower)
+            if match:
+                try:
+                    user_size = float(match.group(1))
+                    break
+                except ValueError:
+                    pass
+    
+    # If user specified a generic size, check if it matches the species size
+    if user_size is not None:
+        size_text = str(species_info.get('size', species_info.get('wingspan', ''))).lower()
+        
+        # First, try to match against length range (e.g., "Length: 3-4 cm" or "3-4 cm")
+        length_range_match = re.search(r'(?:length\s*:?\s*)?(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)', size_text)
+        if length_range_match:
+            try:
+                min_length = float(length_range_match.group(1))
+                max_length = float(length_range_match.group(2))
+                
+                # Check if user size is within the range
+                if min_length <= user_size <= max_length:
+                    # User size is within range - give high score boost
+                    score += 50
+                else:
+                    # User size is outside range - calculate how far off
+                    if user_size < min_length:
+                        diff = min_length - user_size
+                        diff_percent = diff / min_length if min_length > 0 else 1
+                    else:
+                        diff = user_size - max_length
+                        diff_percent = diff / max_length if max_length > 0 else 1
+                    
+                    # If user size is outside range, filter out unless very close (within 5%)
+                    if diff_percent > 0.05:
+                        # Return negative score to filter out this match
+                        return -100, []
+                    # If very close to range (within 5%), slightly reduce score
+                    else:
+                        score -= 10
+            except (ValueError, IndexError):
+                pass
+        else:
+            # Try to extract single length value (e.g., "3 cm" or "Length: 3 cm")
+            single_length_match = re.search(r'(?:length\s*:?\s*)?(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimetre)', size_text)
+            if single_length_match:
+                try:
+                    species_length = float(single_length_match.group(1))
+                    # For single length value, allow some tolerance (±5%)
+                    tolerance = species_length * 0.05
+                    if abs(user_size - species_length) <= tolerance:
+                        # Within tolerance - give high score boost
+                        score += 50
+                    else:
+                        # Outside tolerance - calculate difference
+                        diff_percent = abs(user_size - species_length) / species_length if species_length > 0 else 1
+                        # If difference is more than 5%, filter out
+                        if diff_percent > 0.05:
+                            return -100, []
+                        # If very close (within 5%), slightly reduce score
+                        else:
+                            score -= 10
+                except ValueError:
+                    pass
+    
     # Define field weights
     field_weights = {
         'description': 3,
@@ -2281,6 +2511,103 @@ def calculate_match_score(description, species_info):
         important_fields_matched = sum(1 for mf in matched_fields if mf['field'] in ['distribution', 'habitat', 'common_name'])
         if important_fields_matched >= 2:
             score += 10  # Bonus for matching multiple important fields
+    
+    # Check for habitat mismatch: if user mentioned habitat keywords but species habitat doesn't match
+    habitat_keywords = ['garden', 'gardens', 'park', 'parks', 'forest', 'forests', 'woodland', 'woodlands',
+                       'meadow', 'meadows', 'grassland', 'grasslands', 'field', 'fields', 'water', 'lake', 'lakes',
+                       'river', 'rivers', 'stream', 'streams', 'ocean', 'oceans', 'coast', 'coastal', 'beach', 'beaches',
+                       'mountain', 'mountains', 'hill', 'hills', 'urban', 'city', 'cities', 'rural', 'countryside',
+                       'wetland', 'wetlands', 'marsh', 'marshes', 'swamp', 'swamps', 'desert', 'deserts',
+                       'tundra', 'savanna', 'savannah', 'jungle', 'jungles', 'tropical', 'temperate', 'arctic',
+                       'near', 'around', 'close', 'beside', 'next']
+    
+    # Check if user description contains habitat-related keywords
+    user_habitat_keywords = []
+    for keyword in habitat_keywords:
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        if re.search(pattern, description_lower):
+            user_habitat_keywords.append(keyword)
+    
+    # If user mentioned habitat keywords, check if species habitat matches
+    if user_habitat_keywords:
+        species_habitat = str(species_info.get('habitat', '')).lower()
+        habitat_matched = False
+        
+        # Check if any user habitat keyword appears in species habitat
+        for user_habitat in user_habitat_keywords:
+            # Skip generic words like "near", "around", "close" - they need context
+            if user_habitat in ['near', 'around', 'close', 'beside', 'next']:
+                continue
+            
+            pattern = r'\b' + re.escape(user_habitat) + r'\b'
+            if re.search(pattern, species_habitat):
+                habitat_matched = True
+                break
+        
+        # If user mentioned specific habitat but species habitat doesn't match, apply penalty
+        if not habitat_matched:
+            # Count how many specific habitat keywords (excluding generic location words) were mentioned
+            specific_habitat_count = sum(1 for h in user_habitat_keywords if h not in ['near', 'around', 'close', 'beside', 'next'])
+            if specific_habitat_count > 0:
+                # Apply significant penalty for habitat mismatch
+                # This is important because habitat is a key identifying feature
+                habitat_penalty = specific_habitat_count * 15  # 15 points per unmatched habitat keyword
+                score -= habitat_penalty
+                
+                # If penalty is severe enough, significantly reduce confidence
+                # This will be reflected in the confidence calculation later
+    
+    # Check for color mismatch: if user mentioned color keywords but species description doesn't match
+    color_keywords = ['black', 'white', 'brown', 'red', 'blue', 'green', 'yellow', 
+                     'orange', 'purple', 'grey', 'gray', 'golden', 'silver', 'dark', 
+                     'light', 'bright', 'pale', 'iridescent', 'spotted', 'striped',
+                     'pink', 'crimson', 'scarlet', 'azure', 'turquoise', 'teal',
+                     'cream', 'buff', 'tan', 'chestnut', 'rusty', 'cinnamon',
+                     'violet', 'indigo', 'navy', 'cobalt', 'cerulean', 'sapphire',
+                     'emerald', 'lime', 'olive', 'chartreuse', 'magenta', 'coral',
+                     'bronze', 'copper', 'metallic', 'glossy', 'matte', 'dusky']
+    
+    # Check if user description contains color keywords
+    user_color_keywords = []
+    for keyword in color_keywords:
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        if re.search(pattern, description_lower):
+            user_color_keywords.append(keyword)
+    
+    # If user mentioned color keywords, check if species description matches
+    if user_color_keywords:
+        species_description = str(species_info.get('description', '')).lower()
+        color_matched_count = 0
+        color_mismatch_count = 0
+        
+        # Check if user color keywords appear in species description
+        for user_color in user_color_keywords:
+            # Skip modifiers that need context (like "dark", "light", "bright")
+            if user_color in ['dark', 'light', 'bright', 'pale', 'dusky']:
+                continue
+            
+            pattern = r'\b' + re.escape(user_color) + r'\b'
+            if re.search(pattern, species_description):
+                color_matched_count += 1
+            else:
+                color_mismatch_count += 1
+        
+        # If user mentioned specific colors but species description doesn't match, apply penalty
+        if color_mismatch_count > 0:
+            # Apply significant penalty for color mismatch
+            # Colors are very important identifying features, especially for butterflies
+            color_penalty = color_mismatch_count * 20  # 20 points per unmatched color keyword
+            score -= color_penalty
+            
+            # If most colors don't match, filter out this result
+            total_specific_colors = len([c for c in user_color_keywords if c not in ['dark', 'light', 'bright', 'pale', 'dusky']])
+            if total_specific_colors > 0 and color_matched_count == 0:
+                # All colors mismatch - return negative score to filter out
+                return -100, []
+        elif color_matched_count > 0:
+            # Colors match - give bonus for color accuracy
+            color_bonus = color_matched_count * 10  # 10 points per matched color
+            score += color_bonus
     
     return score, matched_fields
 
