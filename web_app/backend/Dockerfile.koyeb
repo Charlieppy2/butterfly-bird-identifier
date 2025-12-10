@@ -2,7 +2,7 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# 安裝系統依賴
+# 安裝系統依賴（包括音頻處理所需的 ffmpeg）
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     git \
     curl \
+    ffmpeg \
+    libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
 # 安裝 Git LFS

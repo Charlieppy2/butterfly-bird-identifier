@@ -84,16 +84,46 @@ def audio_to_spectrogram(audio_path, target_size=(128, 128)):
             
             # Load audio file with better error handling
             try:
+                # Try loading with librosa - it supports many formats including MP3
+                # If MP3 fails, librosa will try to use audioread backend
                 y, sr = librosa.load(audio_path, sr=None, duration=3.0)  # Load first 3 seconds
             except Exception as load_error:
-                print(f"❌ Error loading audio file with librosa: {load_error}")
+                error_msg = str(load_error)
+                print(f"❌ Error loading audio file with librosa: {error_msg}")
                 print(f"   File path: {audio_path}")
                 # Try to get more info about the file
                 if os.path.exists(audio_path):
                     file_size = os.path.getsize(audio_path)
                     print(f"   File exists, size: {file_size} bytes")
-                # Try fallback method
-                raise load_error
+                
+                # Check if it's a codec/format issue
+                if 'NoBackendError' in error_msg or 'audioread' in error_msg.lower():
+                    print("   ⚠️ MP3 codec support may be missing. Trying alternative method...")
+                    # Try using pydub if available, or suggest conversion
+                    try:
+                        from pydub import AudioSegment
+                        # Load with pydub and convert to WAV
+                        audio = AudioSegment.from_file(audio_path)
+                        # Export to temporary WAV file
+                        temp_wav = audio_path.rsplit('.', 1)[0] + '_temp.wav'
+                        audio.export(temp_wav, format="wav")
+                        # Load the WAV file with librosa
+                        y, sr = librosa.load(temp_wav, sr=None, duration=3.0)
+                        # Clean up temp file
+                        try:
+                            os.remove(temp_wav)
+                        except:
+                            pass
+                        print("   ✅ Successfully converted and loaded audio with pydub")
+                    except ImportError:
+                        print("   ⚠️ pydub not available. Please install: pip install pydub")
+                        raise load_error
+                    except Exception as pydub_error:
+                        print(f"   ❌ pydub conversion also failed: {pydub_error}")
+                        raise load_error
+                else:
+                    # Other errors, just raise
+                    raise load_error
             
             # Check if audio is empty or too short
             if len(y) == 0:
@@ -1215,10 +1245,30 @@ def predict_sound():
         file.save(filepath)
         
         # Convert audio to spectrogram
-        spectrogram = audio_to_spectrogram(filepath)
+        try:
+            spectrogram = audio_to_spectrogram(filepath)
+        except Exception as e:
+            print(f"❌ Error in audio_to_spectrogram: {e}")
+            import traceback
+            traceback.print_exc()
+            # Clean up uploaded file
+            try:
+                os.remove(filepath)
+            except:
+                pass
+            return jsonify({
+                'error': f'Failed to process audio file: {str(e)}. Please ensure the file is a valid audio format (WAV, MP3, M4A, FLAC, OGG, AAC).'
+            }), 500
         
         if spectrogram is None:
-            return jsonify({'error': 'Failed to process audio file. Please ensure the file is a valid audio format.'}), 500
+            # Clean up uploaded file
+            try:
+                os.remove(filepath)
+            except:
+                pass
+            return jsonify({
+                'error': 'Failed to process audio file. The file may be corrupted, empty, or in an unsupported format. Please try a different audio file.'
+            }), 500
         
         # Make prediction
         predictions = bird_sound_model.predict(spectrogram, verbose=0)
