@@ -39,6 +39,18 @@ CORS(app, resources={
     }
 })
 
+# Configure TensorFlow to limit memory growth (prevent OOM on Koyeb)
+try:
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        # Limit GPU memory growth
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    # Limit CPU memory usage (for Koyeb free tier)
+    tf.config.set_soft_device_placement(True)
+except Exception as e:
+    print(f"⚠️ TensorFlow memory configuration warning: {e}")
+
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
