@@ -1025,7 +1025,7 @@ def predict():
         
         # Make prediction - use batch_size=1 to reduce memory usage
         # Optimize prediction: use smaller batch and faster processing
-        predictions = model.predict(processed_image, verbose=0, batch_size=1, workers=1, use_multiprocessing=False)
+        predictions = model.predict(processed_image, verbose=0, batch_size=1)
         predicted_class_idx = np.argmax(predictions[0])
         confidence = float(predictions[0][predicted_class_idx])
         
