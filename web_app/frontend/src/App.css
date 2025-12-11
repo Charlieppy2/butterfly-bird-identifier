@@ -369,6 +369,11 @@
     align-items: stretch;
   }
   
+  .nav-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
   .nav-btn {
     width: 100%;
   }
