@@ -1258,6 +1258,87 @@ def get_classes():
     })
 
 
+@app.route('/api/feedback', methods=['POST', 'OPTIONS'])
+def submit_feedback():
+    """Handle user feedback on identification results"""
+    # Handle preflight OPTIONS request for CORS
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
+    try:
+        feedback_data = request.get_json()
+        
+        # Validate required fields
+        if not feedback_data:
+            return jsonify({'error': 'No feedback data provided'}), 400
+        
+        required_fields = ['prediction_id', 'predicted_species', 'predicted_confidence', 'feedback_type']
+        for field in required_fields:
+            if field not in feedback_data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        # Add timestamp if not provided
+        if 'timestamp' not in feedback_data:
+            feedback_data['timestamp'] = datetime.now().isoformat()
+        
+        # Save feedback to file (JSON format for easy analysis)
+        feedback_dir = 'feedback'
+        os.makedirs(feedback_dir, exist_ok=True)
+        
+        feedback_file = os.path.join(feedback_dir, 'feedback.json')
+        
+        # Load existing feedback
+        existing_feedback = []
+        if os.path.exists(feedback_file):
+            try:
+                with open(feedback_file, 'r', encoding='utf-8') as f:
+                    existing_feedback = json.load(f)
+            except Exception as e:
+                print(f"Warning: Failed to load existing feedback: {e}")
+                existing_feedback = []
+        
+        # Add new feedback
+        existing_feedback.append(feedback_data)
+        
+        # Save updated feedback (keep last 1000 entries to prevent file from growing too large)
+        if len(existing_feedback) > 1000:
+            existing_feedback = existing_feedback[-1000:]
+        
+        with open(feedback_file, 'w', encoding='utf-8') as f:
+            json.dump(existing_feedback, f, indent=2, ensure_ascii=False)
+        
+        print(f"✅ Feedback received: {feedback_data['feedback_type']} for {feedback_data['predicted_species']}")
+        if feedback_data.get('correct_species'):
+            print(f"   Correct species: {feedback_data['correct_species']}")
+        
+        response = jsonify({
+            'success': True,
+            'message': 'Feedback submitted successfully',
+            'feedback_id': feedback_data.get('prediction_id')
+        })
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response, 200
+    
+    except Exception as e:
+        print(f"Error processing feedback: {e}")
+        import traceback
+        traceback.print_exc()
+        response = jsonify({
+            'success': False,
+            'error': str(e)
+        })
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response, 500
+
+
 @app.route('/api/predict-sound', methods=['POST', 'OPTIONS'])
 def predict_sound():
     """Handle audio file upload and bird sound identification"""

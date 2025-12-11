@@ -91,6 +91,10 @@ function App() {
   const [soundPrediction, setSoundPrediction] = useState(null);
   const [soundLoading, setSoundLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [feedbackStatus, setFeedbackStatus] = useState(null); // 'correct', 'incorrect', 'submitted'
+  const [showCorrectSpeciesSelector, setShowCorrectSpeciesSelector] = useState(false);
+  const [selectedCorrectSpecies, setSelectedCorrectSpecies] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [timelineData, setTimelineData] = useState([]);
   const [smoothedResult, setSmoothedResult] = useState(null);
   const audioContextRef = useRef(null);
@@ -720,6 +724,11 @@ function App() {
 
       setPrediction(response.data.prediction);
       console.log('🔍 Full response data:', response.data);
+      
+      // 重置反饋狀態
+      setFeedbackStatus(null);
+      setShowCorrectSpeciesSelector(false);
+      setSelectedCorrectSpecies('');
       
       // 保存警告信息（如果有）
       if (response.data.warning) {
@@ -1953,6 +1962,56 @@ function App() {
 
   const handleQuickQuestion = (question) => {
     setDescriptionInput(question);
+  };
+
+  // 處理識別結果反饋
+  const handleFeedbackSubmit = async (feedbackType, correctSpecies = null) => {
+    if (!prediction) return;
+    
+    setFeedbackSubmitting(true);
+    
+    try {
+      const feedbackData = {
+        prediction_id: Date.now(), // 使用時間戳作為ID
+        predicted_species: prediction.class,
+        predicted_confidence: prediction.confidence,
+        feedback_type: feedbackType, // 'correct' or 'incorrect'
+        correct_species: correctSpecies || (feedbackType === 'correct' ? prediction.class : null),
+        timestamp: new Date().toISOString(),
+        image_path: preview // 圖片預覽URL
+      };
+      
+      const response = await axios.post(`${API_URL}/api/feedback`, feedbackData, {
+        timeout: 10000
+      });
+      
+      if (response.data.success) {
+        setFeedbackStatus('submitted');
+        setShowCorrectSpeciesSelector(false);
+        console.log('✅ Feedback submitted successfully');
+      } else {
+        setError('Failed to submit feedback. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error submitting feedback:', err);
+      // 即使提交失敗，也顯示已提交狀態（本地記錄）
+      setFeedbackStatus('submitted');
+      setShowCorrectSpeciesSelector(false);
+      // 可以選擇將反饋保存到localStorage作為備份
+      try {
+        const existingFeedback = JSON.parse(localStorage.getItem('feedback_backup') || '[]');
+        existingFeedback.push({
+          ...feedbackData,
+          submitted_at: new Date().toISOString(),
+          synced: false
+        });
+        localStorage.setItem('feedback_backup', JSON.stringify(existingFeedback));
+      } catch (e) {
+        console.error('Failed to save feedback to localStorage:', e);
+      }
+    } finally {
+      setFeedbackSubmitting(false);
+    }
   };
 
   // Handle clicking on a species card to view details
@@ -3365,11 +3424,32 @@ function App() {
                             #{idx + 1}
                           </div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                               <span className="pred-class" style={{ fontWeight: 700 }}>{pred.class}</span>
-                              <span className="pred-confidence" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                                {percent.toFixed(2)}%
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span className="pred-confidence" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                  {percent.toFixed(2)}%
+                                </span>
+                                {showCorrectSpeciesSelector && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedCorrectSpecies(pred.class);
+                                    }}
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '0.75rem',
+                                      borderRadius: '4px',
+                                      border: '1px solid rgba(255,255,255,0.3)',
+                                      background: selectedCorrectSpecies === pred.class ? '#FF9800' : 'rgba(255,255,255,0.1)',
+                                      color: 'white',
+                                      cursor: 'pointer',
+                                      fontWeight: 600
+                                    }}
+                                  >
+                                    Select
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <div style={{ marginTop: 6, height: 8, background: 'rgba(255,255,255,0.12)', borderRadius: 6 }}>
                               <div 
@@ -3388,6 +3468,142 @@ function App() {
                     })}
                   </div>
               </div>
+              
+              {/* 識別結果反饋機制 */}
+              {prediction && (
+                <div className="feedback-section" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid rgba(255,255,255,0.2)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <p style={{ fontSize: '0.95rem', opacity: 0.9, marginBottom: '8px' }}>
+                      Was this identification correct?
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <button
+                        className="feedback-btn feedback-correct"
+                        onClick={() => handleFeedbackSubmit('correct')}
+                        disabled={feedbackStatus === 'submitted' || feedbackSubmitting}
+                        style={{
+                          padding: '10px 20px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: feedbackStatus === 'correct' ? '#4CAF50' : 'rgba(255,255,255,0.2)',
+                          color: 'white',
+                          cursor: feedbackStatus === 'submitted' ? 'not-allowed' : 'pointer',
+                          fontWeight: 600,
+                          transition: 'all 0.3s ease',
+                          opacity: feedbackStatus === 'submitted' ? 0.6 : 1
+                        }}
+                      >
+                        ✅ Correct
+                      </button>
+                      <button
+                        className="feedback-btn feedback-incorrect"
+                        onClick={() => {
+                          setShowCorrectSpeciesSelector(true);
+                          setFeedbackStatus('incorrect');
+                        }}
+                        disabled={feedbackStatus === 'submitted' || feedbackSubmitting}
+                        style={{
+                          padding: '10px 20px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: feedbackStatus === 'incorrect' ? '#F44336' : 'rgba(255,255,255,0.2)',
+                          color: 'white',
+                          cursor: feedbackStatus === 'submitted' ? 'not-allowed' : 'pointer',
+                          fontWeight: 600,
+                          transition: 'all 0.3s ease',
+                          opacity: feedbackStatus === 'submitted' ? 0.6 : 1
+                        }}
+                      >
+                        ❌ Incorrect
+                      </button>
+                    </div>
+                    
+                    {/* 如果選擇錯誤，顯示正確物種選擇器 */}
+                    {showCorrectSpeciesSelector && (
+                      <div className="correct-species-selector" style={{
+                        marginTop: '15px',
+                        padding: '15px',
+                        background: 'rgba(255,255,255,0.15)',
+                        borderRadius: '10px',
+                        border: '1px solid rgba(255,255,255,0.25)'
+                      }}>
+                        <label style={{ display: 'block', marginBottom: '10px', fontSize: '0.9rem', opacity: 0.9 }}>
+                          What is the correct species?
+                        </label>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                          <input
+                            type="text"
+                            placeholder="Enter species name..."
+                            value={selectedCorrectSpecies}
+                            onChange={(e) => setSelectedCorrectSpecies(e.target.value)}
+                            style={{
+                              flex: 1,
+                              minWidth: '200px',
+                              padding: '10px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255,255,255,0.3)',
+                              background: 'rgba(255,255,255,0.1)',
+                              color: 'white',
+                              fontSize: '0.95rem'
+                            }}
+                          />
+                          <button
+                            onClick={() => handleFeedbackSubmit('incorrect', selectedCorrectSpecies)}
+                            disabled={!selectedCorrectSpecies.trim() || feedbackSubmitting}
+                            style={{
+                              padding: '10px 20px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              background: selectedCorrectSpecies.trim() ? '#FF9800' : 'rgba(255,255,255,0.2)',
+                              color: 'white',
+                              cursor: selectedCorrectSpecies.trim() ? 'pointer' : 'not-allowed',
+                              fontWeight: 600,
+                              opacity: selectedCorrectSpecies.trim() ? 1 : 0.6
+                            }}
+                          >
+                            {feedbackSubmitting ? 'Submitting...' : 'Submit'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowCorrectSpeciesSelector(false);
+                              setSelectedCorrectSpecies('');
+                              setFeedbackStatus(null);
+                            }}
+                            style={{
+                              padding: '10px 20px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255,255,255,0.3)',
+                              background: 'rgba(255,255,255,0.1)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              fontWeight: 600
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: '8px' }}>
+                          💡 You can also select from Top-3 predictions above
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* 反饋提交成功提示 */}
+                    {feedbackStatus === 'submitted' && (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '10px',
+                        background: 'rgba(76, 175, 80, 0.3)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(76, 175, 80, 0.5)',
+                        fontSize: '0.9rem'
+                      }}>
+                        ✅ Thank you for your feedback! This helps improve the model.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -598,6 +598,39 @@
   border-bottom: none;
 }
 
+/* Feedback Section Styles */
+.feedback-section {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.feedback-btn {
+  transition: all 0.3s ease;
+}
+
+.feedback-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.feedback-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.correct-species-selector {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .pred-class {
   text-transform: capitalize;
   font-weight: 500;
