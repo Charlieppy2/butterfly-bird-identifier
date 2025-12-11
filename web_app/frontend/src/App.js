@@ -165,6 +165,7 @@ function App() {
     }
   });
   const [showCollection, setShowCollection] = useState(false);
+  const [collectionSort, setCollectionSort] = useState('default'); // 'default', 'birds-first', 'butterflies-first'
   const [collectionNotification, setCollectionNotification] = useState(null); // For animation
   const [enlargedImage, setEnlargedImage] = useState(null); // { url, title }
   const [showBirdsPage, setShowBirdsPage] = useState(false);
@@ -191,9 +192,8 @@ function App() {
   // Conversation history management
   const [conversationHistory, setConversationHistory] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
-  const [swipedItemId, setSwipedItemId] = useState(null);
-  const [touchStartX, setTouchStartX] = useState(null);
-  const [touchEndX, setTouchEndX] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState(null);
   
   // Species Detail Modal State
   const [selectedSpeciesDetail, setSelectedSpeciesDetail] = useState(null);
@@ -1888,75 +1888,75 @@ function App() {
     }
   };
 
+  // Check if "don't ask today" is set
+  const shouldSkipDeleteConfirm = () => {
+    const skipUntil = localStorage.getItem('skipDeleteConfirmUntil');
+    if (skipUntil) {
+      const skipUntilDate = new Date(skipUntil);
+      const now = new Date();
+      // Check if we're still within the same day
+      if (now < skipUntilDate) {
+        return true;
+      } else {
+        // Expired, remove it
+        localStorage.removeItem('skipDeleteConfirmUntil');
+      }
+    }
+    return false;
+  };
+
+  // Set "don't ask today"
+  const setSkipDeleteConfirmToday = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0); // Start of tomorrow
+    localStorage.setItem('skipDeleteConfirmUntil', tomorrow.toISOString());
+  };
+
+  const handleDeleteClick = (conversationId) => {
+    // Check if we should skip confirmation
+    if (shouldSkipDeleteConfirm()) {
+      deleteConversation(conversationId);
+    } else {
+      // Show confirmation dialog
+      setConversationToDelete(conversationId);
+      setShowDeleteConfirm(true);
+    }
+  };
+
+  const confirmDelete = (skipToday = false) => {
+    if (skipToday) {
+      setSkipDeleteConfirmToday();
+    }
+    if (conversationToDelete) {
+      deleteConversation(conversationToDelete);
+    }
+    setShowDeleteConfirm(false);
+    setConversationToDelete(null);
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setConversationToDelete(null);
+  };
+
   const deleteConversation = (conversationId) => {
+    const willBeEmpty = conversationHistory.length === 1;
     setConversationHistory(prev => prev.filter(conv => conv.id !== conversationId));
+    
     if (currentConversationId === conversationId) {
-      // If deleting current conversation, create a new one
-      createNewConversation();
+      if (willBeEmpty) {
+        // If deleting the last conversation, clear all state and show "no history" message
+        setCurrentConversationId(null);
+        setDescriptionConversation([]);
+        setCurrentMatches([]);
+        setDescriptionResults(null);
+        setDescriptionInput('');
+      } else {
+        // If deleting current conversation but there are others, create a new one
+        createNewConversation();
+      }
     }
-    setSwipedItemId(null);
-  };
-
-  // Handle touch events for swipe to delete
-  const handleTouchStart = (e, itemId) => {
-    setTouchStartX(e.touches[0].clientX);
-    setSwipedItemId(itemId);
-  };
-
-  const handleTouchMove = (e) => {
-    setTouchEndX(e.touches[0].clientX);
-  };
-
-  const handleTouchEnd = (itemId) => {
-    if (!touchStartX || !touchEndX) return;
-    
-    const distance = touchStartX - touchEndX;
-    const isLeftSwipe = distance > 50; // Swipe threshold: 50px
-    const isRightSwipe = distance < -50;
-
-    if (isLeftSwipe) {
-      // Swipe left to reveal delete button
-      setSwipedItemId(itemId);
-    } else if (isRightSwipe) {
-      // Swipe right to hide delete button
-      setSwipedItemId(null);
-    }
-    
-    setTouchStartX(null);
-    setTouchEndX(null);
-  };
-
-  // Handle mouse events for desktop swipe
-  const handleMouseDown = (e, itemId) => {
-    setTouchStartX(e.clientX);
-    setSwipedItemId(itemId);
-  };
-
-  const handleMouseMove = (e) => {
-    if (touchStartX !== null) {
-      setTouchEndX(e.clientX);
-    }
-  };
-
-  const handleMouseUp = (itemId) => {
-    if (!touchStartX || touchEndX === null) {
-      setTouchStartX(null);
-      setTouchEndX(null);
-      return;
-    }
-    
-    const distance = touchStartX - touchEndX;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
-
-    if (isLeftSwipe) {
-      setSwipedItemId(itemId);
-    } else if (isRightSwipe) {
-      setSwipedItemId(null);
-    }
-    
-    setTouchStartX(null);
-    setTouchEndX(null);
   };
 
   const handleStartNewDescriptionChat = () => {
@@ -2705,50 +2705,35 @@ function App() {
                     conversationHistory.map((conv) => (
                       <div
                         key={conv.id}
-                        className="history-item-wrapper"
-                        onTouchStart={(e) => handleTouchStart(e, conv.id)}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={() => handleTouchEnd(conv.id)}
-                        onMouseDown={(e) => handleMouseDown(e, conv.id)}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={() => handleMouseUp(conv.id)}
-                        onMouseLeave={() => {
-                          if (swipedItemId === conv.id) {
-                            setSwipedItemId(null);
-                            setTouchStartX(null);
-                            setTouchEndX(null);
-                          }
-                        }}
+                        className={`history-item ${currentConversationId === conv.id ? 'active' : ''}`}
+                        onClick={() => loadConversation(conv.id)}
                       >
-                        <div
-                          className={`history-item ${currentConversationId === conv.id ? 'active' : ''} ${swipedItemId === conv.id ? 'swiped' : ''}`}
-                          onClick={() => {
-                            if (swipedItemId !== conv.id) {
-                              loadConversation(conv.id);
-                            }
-                          }}
-                        >
-                          <div className="history-item-header">
-                            <span className="history-category">
-                              {conv.category === 'bird' ? '🐦' : conv.category === 'butterfly' ? '🦋' : '🔍'}
-                            </span>
-                          </div>
-                          <div className="history-item-content">
-                            <p className="history-preview">
-                              {conv.messages && conv.messages.length > 0
-                                ? conv.messages[0].content.substring(0, 50) + (conv.messages[0].content.length > 50 ? '...' : '')
-                                : 'Empty conversation'}
-                            </p>
-                            <span className="history-time">
-                              {new Date(conv.updatedAt || conv.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
+                        <div className="history-item-header">
+                          <span className="history-category">
+                            {conv.category === 'bird' ? '🐦' : conv.category === 'butterfly' ? '🦋' : '🔍'}
+                          </span>
+                          <button
+                            className="delete-history-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(conv.id);
+                            }}
+                            title="Delete conversation"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
                         </div>
-                        <div 
-                          className="history-item-delete"
-                          onClick={() => deleteConversation(conv.id)}
-                        >
-                          🗑️ Delete
+                        <div className="history-item-content">
+                          <p className="history-preview">
+                            {conv.messages && conv.messages.length > 0
+                              ? conv.messages[0].content.substring(0, 50) + (conv.messages[0].content.length > 50 ? '...' : '')
+                              : 'Empty conversation'}
+                          </p>
+                          <span className="history-time">
+                            {new Date(conv.updatedAt || conv.createdAt).toLocaleDateString()}
+                          </span>
                         </div>
                       </div>
                     ))
@@ -2990,6 +2975,44 @@ function App() {
                 ⚠️ {error}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="delete-confirm-overlay" onClick={cancelDelete}>
+            <div className="delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="delete-confirm-header">
+                <h3>🗑️ Delete Conversation</h3>
+              </div>
+              <div className="delete-confirm-content">
+                <p>Are you sure you want to delete this conversation? This action cannot be undone.</p>
+                <label className="skip-confirm-checkbox">
+                  <input
+                    type="checkbox"
+                    id="skipConfirmToday"
+                  />
+                  <span>Don't ask again today</span>
+                </label>
+              </div>
+              <div className="delete-confirm-buttons">
+                <button
+                  className="delete-confirm-cancel"
+                  onClick={cancelDelete}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="delete-confirm-delete"
+                  onClick={() => {
+                    const skipToday = document.getElementById('skipConfirmToday')?.checked || false;
+                    confirmDelete(skipToday);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -3392,6 +3415,31 @@ function App() {
               </button>
             </div>
 
+            {/* Sort Options */}
+            <div className="collection-sort-options">
+              <label>Sort by:</label>
+              <div className="sort-buttons">
+                <button
+                  className={`sort-btn ${collectionSort === 'default' ? 'active' : ''}`}
+                  onClick={() => setCollectionSort('default')}
+                >
+                  A-Z
+                </button>
+                <button
+                  className={`sort-btn ${collectionSort === 'birds-first' ? 'active' : ''}`}
+                  onClick={() => setCollectionSort('birds-first')}
+                >
+                  🐦 Birds First
+                </button>
+                <button
+                  className={`sort-btn ${collectionSort === 'butterflies-first' ? 'active' : ''}`}
+                  onClick={() => setCollectionSort('butterflies-first')}
+                >
+                  🦋 Butterflies First
+                </button>
+              </div>
+            </div>
+
             <div className="collection-grid">
               {/* Load and display all species */}
               {(() => {
@@ -3399,21 +3447,48 @@ function App() {
                 // Show all species (no filtering by category)
                 let filteredSpecies = allSpecies;
 
-                // Sort: collected species first, then uncollected
+                // Create sets for efficient lookup
+                const birdIds = new Set(birdsData.map(bird => getSpeciesId(bird)));
+                const butterflyIds = new Set(butterfliesData.map(butterfly => getSpeciesId(butterfly)));
+                
+                // Sort: collected species first, then by selected sort option
                 const sortedSpecies = filteredSpecies.sort((a, b) => {
                   const aId = getSpeciesId(a);
                   const bId = getSpeciesId(b);
                   const aCollected = isSpeciesCollected(aId);
                   const bCollected = isSpeciesCollected(bId);
                   
-                  // Collected species come first
+                  // Collected species always come first
                   if (aCollected && !bCollected) return -1;
                   if (!aCollected && bCollected) return 1;
                   
-                  // If both have same collection status, sort alphabetically by common name
-                  const aName = a.common_name || '';
-                  const bName = b.common_name || '';
-                  return aName.localeCompare(bName);
+                  // If both have same collection status, apply selected sort
+                  if (collectionSort === 'birds-first') {
+                    // Birds first, then butterflies
+                    const aIsBird = birdIds.has(aId);
+                    const bIsBird = birdIds.has(bId);
+                    if (aIsBird && !bIsBird) return -1;
+                    if (!aIsBird && bIsBird) return 1;
+                    // Same category, sort alphabetically
+                    const aName = a.common_name || '';
+                    const bName = b.common_name || '';
+                    return aName.localeCompare(bName);
+                  } else if (collectionSort === 'butterflies-first') {
+                    // Butterflies first, then birds
+                    const aIsButterfly = butterflyIds.has(aId);
+                    const bIsButterfly = butterflyIds.has(bId);
+                    if (aIsButterfly && !bIsButterfly) return -1;
+                    if (!aIsButterfly && bIsButterfly) return 1;
+                    // Same category, sort alphabetically
+                    const aName = a.common_name || '';
+                    const bName = b.common_name || '';
+                    return aName.localeCompare(bName);
+                  } else {
+                    // Default: A-Z alphabetical
+                    const aName = a.common_name || '';
+                    const bName = b.common_name || '';
+                    return aName.localeCompare(bName);
+                  }
                 });
 
 
@@ -3421,12 +3496,18 @@ function App() {
                   const speciesId = getSpeciesId(species);
                   const isCollected = isSpeciesCollected(speciesId);
                   
+                  // Determine category based on which dataset the species belongs to
+                  const isBird = birdIds.has(speciesId);
+                  const category = isBird ? 'Bird' : 'Butterfly/Moth';
+                  
                   // Debug logging for first few species
                   if (idx < 3) {
                     console.log('🔍 Collection check:', {
                       common_name: species.common_name,
                       speciesId,
                       isCollected,
+                      isBird,
+                      category,
                       hasKey: !!species.key,
                       image_path: species.image_path
                     });
@@ -3462,8 +3543,8 @@ function App() {
                         {species.scientific_name && (
                           <p className="collection-scientific">{species.scientific_name}</p>
                         )}
-                        <span className={`collection-category ${(species.category || species.type || '').toLowerCase()}`}>
-                          {species.category || (species.type === 'bird' ? 'Bird' : 'Butterfly/Moth')}
+                        <span className={`collection-category ${category.toLowerCase().replace('/', '-')}`}>
+                          {category}
                         </span>
                       </div>
                     </div>
