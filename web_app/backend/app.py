@@ -959,9 +959,9 @@ def analyze_image_quality(image_path):
 def index():
     """Health check endpoint - Must respond quickly for Koyeb health checks"""
     try:
-    return jsonify({
-        'status': 'success',
-        'message': 'Butterfly and Bird Identification API is running',
+        return jsonify({
+            'status': 'success',
+            'message': 'Butterfly and Bird Identification API is running',
             'model_loaded': model is not None,
             'bird_sound_model_loaded': bird_sound_model is not None
         }), 200
@@ -1173,7 +1173,7 @@ def predict():
         tf.keras.backend.clear_session()
         # Force garbage collection multiple times to ensure memory is freed
         for _ in range(2):
-        gc.collect()
+            gc.collect()
         
         # Debug: Log similar species before returning
         print(f"Returning {len(similar_species)} similar species")
@@ -2595,7 +2595,7 @@ def calculate_match_score(description, species_info):
                 
                 # Also check for general keywords in distribution (only if no location matches)
                 if field_match_count == 0:
-            for keyword in keywords:
+                    for keyword in keywords:
                         # Skip ambiguous words that could cause false matches
                         if keyword.lower() in ['central', 'west', 'east', 'north', 'south', 'western', 'eastern', 
                                              'northern', 'southern']:
@@ -2603,15 +2603,15 @@ def calculate_match_score(description, species_info):
                         # Use word boundary for exact word matching (not substring)
                         pattern = r'\b' + re.escape(keyword) + r'\b'
                         if re.search(pattern, field_text, re.IGNORECASE):
-                    field_match_count += 1
+                            field_match_count += 1
                             matched_keywords_list.append(keyword)
-            else:
-                # For other fields, use word boundary matching for better accuracy
-                for keyword in keywords:
-                    # Use word boundary for exact word matching
-                    pattern = r'\b' + re.escape(keyword) + r'\b'
-                    if re.search(pattern, field_text, re.IGNORECASE):
-                        field_match_count += 1
+                else:
+                    # For other fields, use word boundary matching for better accuracy
+                    for keyword in keywords:
+                        # Use word boundary for exact word matching
+                        pattern = r'\b' + re.escape(keyword) + r'\b'
+                        if re.search(pattern, field_text, re.IGNORECASE):
+                            field_match_count += 1
                         matched_keywords_list.append(keyword)
             
             if field_match_count > 0:
@@ -3381,7 +3381,7 @@ if __name__ == '__main__':
     
     try:
         print("Loading image identification model...")
-    load_model()
+        load_model()
         print("Loading bird sound model...")
         load_bird_sound_model()
         
