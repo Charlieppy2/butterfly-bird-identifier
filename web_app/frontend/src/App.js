@@ -97,6 +97,8 @@ function App() {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [timelineData, setTimelineData] = useState([]);
   const [smoothedResult, setSmoothedResult] = useState(null);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
   const audioContextRef = useRef(null);
   const isAnalyzingRef = useRef(false);
   const [chatMessages, setChatMessages] = useState([
@@ -193,6 +195,7 @@ function App() {
   const streamRef = useRef(null);
   const historyExportRef = useRef(null);
   const favoritesExportRef = useRef(null);
+  const shareMenuRef = useRef(null);
 
   const handleAudioSelect = (e) => {
     const file = e.target.files[0];
@@ -914,7 +917,7 @@ function App() {
     checkApiHealth();
   }, []); // Run once on mount
 
-  // Close export menus when clicking outside
+  // Close export menus and share menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (historyExportRef.current && !historyExportRef.current.contains(event.target)) {
@@ -922,6 +925,9 @@ function App() {
       }
       if (favoritesExportRef.current && !favoritesExportRef.current.contains(event.target)) {
         setShowFavoritesExportMenu(false);
+      }
+      if (shareMenuRef.current && !shareMenuRef.current.contains(event.target)) {
+        setShowShareMenu(false);
       }
     };
 
@@ -2019,6 +2025,72 @@ function App() {
   const handleSpeciesCardClick = (species) => {
     setSelectedSpeciesDetail(species);
     setShowSpeciesModal(true);
+  };
+
+  // 處理識別結果分享
+  const handleShare = async (method = 'copy') => {
+    if (!prediction || !preview) return;
+
+    const shareText = `🦋 I identified this as: ${prediction.class} (${(prediction.confidence * 100).toFixed(1)}% confidence)\n\nTop Predictions:\n${prediction.top_predictions.slice(0, 3).map((p, idx) => `${idx + 1}. ${p.class} (${(p.confidence * 100).toFixed(1)}%)`).join('\n')}\n\nIdentified using Butterfly & Bird Identifier 🐦`;
+
+    try {
+      if (method === 'copy') {
+        // 複製到剪貼板
+        await navigator.clipboard.writeText(shareText);
+        setShareMessage('✅ Copied to clipboard!');
+        setTimeout(() => setShareMessage(''), 3000);
+      } else if (method === 'native') {
+        // 使用原生分享API（移動端）
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: `Identified: ${prediction.class}`,
+              text: shareText,
+              url: window.location.href
+            });
+            setShareMessage('✅ Shared successfully!');
+            setTimeout(() => setShareMessage(''), 3000);
+          } catch (err) {
+            if (err.name !== 'AbortError') {
+              // 如果用戶取消分享，不顯示錯誤
+              console.error('Error sharing:', err);
+              // 降級到複製
+              await navigator.clipboard.writeText(shareText);
+              setShareMessage('✅ Copied to clipboard!');
+              setTimeout(() => setShareMessage(''), 3000);
+            }
+          }
+        } else {
+          // 不支持原生分享，降級到複製
+          await navigator.clipboard.writeText(shareText);
+          setShareMessage('✅ Copied to clipboard!');
+          setTimeout(() => setShareMessage(''), 3000);
+        }
+      } else if (method === 'twitter') {
+        // 分享到Twitter
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(window.location.href)}`;
+        window.open(twitterUrl, '_blank', 'width=550,height=420');
+        setShareMessage('✅ Opening Twitter...');
+        setTimeout(() => setShareMessage(''), 3000);
+      } else if (method === 'facebook') {
+        // 分享到Facebook
+        const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent(shareText)}`;
+        window.open(facebookUrl, '_blank', 'width=550,height=420');
+        setShareMessage('✅ Opening Facebook...');
+        setTimeout(() => setShareMessage(''), 3000);
+      } else if (method === 'whatsapp') {
+        // 分享到WhatsApp
+        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText + '\n\n' + window.location.href)}`;
+        window.open(whatsappUrl, '_blank');
+        setShareMessage('✅ Opening WhatsApp...');
+        setTimeout(() => setShareMessage(''), 3000);
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+      setShareMessage('❌ Failed to share. Please try again.');
+      setTimeout(() => setShareMessage(''), 3000);
+    }
+    setShowShareMenu(false);
   };
 
   // Add species to collection
@@ -3326,14 +3398,164 @@ function App() {
             <div className="prediction-result">
               <div className="result-header">
               <h2>Identification Result</h2>
-                <button
-                  className={`favorite-btn ${isCurrentFavorite() ? 'favorited' : ''}`}
-                  onClick={handleToggleFavorite}
-                  title={isCurrentFavorite() ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  {isCurrentFavorite() ? '❤️' : '🤍'}
-                </button>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ position: 'relative' }} ref={shareMenuRef}>
+                    <button
+                      className="share-btn"
+                      onClick={() => setShowShareMenu(!showShareMenu)}
+                      title="Share identification result"
+                      style={{
+                        background: 'rgba(255,255,255,0.15)',
+                        border: '1px solid rgba(255,255,255,0.3)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '1.2rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      📤 Share
+                    </button>
+                    {showShareMenu && (
+                      <div className="share-menu" style={{
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '8px',
+                        background: 'rgba(30,30,30,0.98)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        minWidth: '200px',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                        zIndex: 1000,
+                        animation: 'fadeIn 0.2s ease-out'
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {navigator.share && (
+                            <button
+                              onClick={() => handleShare('native')}
+                              style={{
+                                padding: '10px 15px',
+                                background: 'rgba(255,255,255,0.1)',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                borderRadius: '8px',
+                                color: 'white',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                fontSize: '0.95rem',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
+                              onMouseLeave={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
+                            >
+                              📱 Share (Native)
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleShare('copy')}
+                            style={{
+                              padding: '10px 15px',
+                              background: 'rgba(255,255,255,0.1)',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              borderRadius: '8px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              fontSize: '0.95rem',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
+                            onMouseLeave={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
+                          >
+                            📋 Copy Text
+                          </button>
+                          <button
+                            onClick={() => handleShare('twitter')}
+                            style={{
+                              padding: '10px 15px',
+                              background: 'rgba(29,161,242,0.2)',
+                              border: '1px solid rgba(29,161,242,0.4)',
+                              borderRadius: '8px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              fontSize: '0.95rem',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = 'rgba(29,161,242,0.3)'}
+                            onMouseLeave={(e) => e.target.style.background = 'rgba(29,161,242,0.2)'}
+                          >
+                            🐦 Twitter
+                          </button>
+                          <button
+                            onClick={() => handleShare('facebook')}
+                            style={{
+                              padding: '10px 15px',
+                              background: 'rgba(24,119,242,0.2)',
+                              border: '1px solid rgba(24,119,242,0.4)',
+                              borderRadius: '8px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              fontSize: '0.95rem',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = 'rgba(24,119,242,0.3)'}
+                            onMouseLeave={(e) => e.target.style.background = 'rgba(24,119,242,0.2)'}
+                          >
+                            📘 Facebook
+                          </button>
+                          <button
+                            onClick={() => handleShare('whatsapp')}
+                            style={{
+                              padding: '10px 15px',
+                              background: 'rgba(37,211,102,0.2)',
+                              border: '1px solid rgba(37,211,102,0.4)',
+                              borderRadius: '8px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              fontSize: '0.95rem',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = 'rgba(37,211,102,0.3)'}
+                            onMouseLeave={(e) => e.target.style.background = 'rgba(37,211,102,0.2)'}
+                          >
+                            💬 WhatsApp
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className={`favorite-btn ${isCurrentFavorite() ? 'favorited' : ''}`}
+                    onClick={handleToggleFavorite}
+                    title={isCurrentFavorite() ? 'Remove from favorites' : 'Add to favorites'}
+                  >
+                    {isCurrentFavorite() ? '❤️' : '🤍'}
+                  </button>
+                </div>
               </div>
+              {shareMessage && (
+                <div style={{
+                  marginTop: '10px',
+                  padding: '10px 15px',
+                  background: shareMessage.includes('✅') ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)',
+                  border: `1px solid ${shareMessage.includes('✅') ? 'rgba(76, 175, 80, 0.5)' : 'rgba(244, 67, 54, 0.5)'}`,
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '0.9rem',
+                  textAlign: 'center',
+                  animation: 'fadeIn 0.3s ease-out'
+                }}>
+                  {shareMessage}
+                </div>
+              )}
               
               {/* 顯示警告信息（如果是非蝴蝶/鳥類圖片） */}
               {warning && (
