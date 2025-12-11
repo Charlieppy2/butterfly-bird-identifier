@@ -2437,7 +2437,7 @@ function App() {
               🎵 Bird Sound ID
             </button>
             <button 
-              className={`nav-btn field-guide-btn ${showCollection ? 'active' : ''}`}
+              className={`nav-btn ${showCollection ? 'active' : ''}`}
               onClick={() => { 
                 setShowCollection(true); 
                 setShowBirdsPage(false);
@@ -2446,12 +2446,7 @@ function App() {
                 setSoundMode(false);
               }}
             >
-              <span className="field-guide-icon">
-                <span className="guide-book guide-book-1"></span>
-                <span className="guide-book guide-book-2"></span>
-                <span className="guide-book guide-book-3"></span>
-              </span>
-              <span className="field-guide-text">Field Guide</span>
+              📚 Field Guide
             </button>
           </div>
         </div>
