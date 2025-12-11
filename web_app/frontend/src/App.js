@@ -1912,54 +1912,58 @@ function App() {
         <h1>🦋🐦 Butterfly & Bird Identifier</h1>
         <p>AI-Powered Species Identification System</p>
         <div className="main-navigation">
-          <button 
-            className={`nav-btn ${showBirdsPage ? 'active' : ''}`}
-            onClick={() => { handleShowBirds(); setShowDescriptionMode(false); setSoundMode(false); }}
-          >
-            🐦 Birds (200)
-          </button>
-          <button 
-            className={`nav-btn ${showButterfliesPage ? 'active' : ''}`}
-            onClick={() => { handleShowButterflies(); setShowDescriptionMode(false); setSoundMode(false); }}
-          >
-            🦋 Butterflies (100)
-          </button>
-          <button 
-            className={`nav-btn ${!showBirdsPage && !showButterfliesPage && !showDescriptionMode && !soundMode ? 'active' : ''}`}
-            onClick={() => { handleShowMain(); setShowDescriptionMode(false); setSoundMode(false); }}
-          >
-            🔍 Identify
-          </button>
-          <button 
-            className={`nav-btn ${showDescriptionMode ? 'active' : ''}`}
-            onClick={() => { handleShowMain(); setShowDescriptionMode(true); setSoundMode(false); }}
-          >
-            💬 Describe to Identify
-          </button>
-          <button 
-            className={`nav-btn ${soundMode ? 'active' : ''}`}
-            onClick={() => { 
-              setSoundMode(true); 
-              setShowDescriptionMode(false);
-              setShowBirdsPage(false);
-              setShowButterfliesPage(false);
-              setShowCollection(false);
-            }}
-          >
-            🎵 Bird Sound ID
-          </button>
-          <button 
-            className={`nav-btn ${showCollection ? 'active' : ''}`}
-            onClick={() => { 
-              setShowCollection(true); 
-              setShowBirdsPage(false);
-              setShowButterfliesPage(false);
-              setShowDescriptionMode(false);
-              setSoundMode(false);
-            }}
-          >
-            📚 Field Guide
-          </button>
+          <div className="nav-row nav-row-primary">
+            <button 
+              className={`nav-btn ${showBirdsPage ? 'active' : ''}`}
+              onClick={() => { handleShowBirds(); setShowDescriptionMode(false); setSoundMode(false); }}
+            >
+              🐦 Birds (200)
+            </button>
+            <button 
+              className={`nav-btn ${showButterfliesPage ? 'active' : ''}`}
+              onClick={() => { handleShowButterflies(); setShowDescriptionMode(false); setSoundMode(false); }}
+            >
+              🦋 Butterflies (100)
+            </button>
+          </div>
+          <div className="nav-row nav-row-secondary">
+            <button 
+              className={`nav-btn ${!showBirdsPage && !showButterfliesPage && !showDescriptionMode && !soundMode ? 'active' : ''}`}
+              onClick={() => { handleShowMain(); setShowDescriptionMode(false); setSoundMode(false); }}
+            >
+              🔍 Identify
+            </button>
+            <button 
+              className={`nav-btn ${showDescriptionMode ? 'active' : ''}`}
+              onClick={() => { handleShowMain(); setShowDescriptionMode(true); setSoundMode(false); }}
+            >
+              💬 Describe to Identify
+            </button>
+            <button 
+              className={`nav-btn ${soundMode ? 'active' : ''}`}
+              onClick={() => { 
+                setSoundMode(true); 
+                setShowDescriptionMode(false);
+                setShowBirdsPage(false);
+                setShowButterfliesPage(false);
+                setShowCollection(false);
+              }}
+            >
+              🎵 Bird Sound ID
+            </button>
+            <button 
+              className={`nav-btn ${showCollection ? 'active' : ''}`}
+              onClick={() => { 
+                setShowCollection(true); 
+                setShowBirdsPage(false);
+                setShowButterfliesPage(false);
+                setShowDescriptionMode(false);
+                setSoundMode(false);
+              }}
+            >
+              📚 Field Guide
+            </button>
+          </div>
         </div>
       </header>
 

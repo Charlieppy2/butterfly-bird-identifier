@@ -36,10 +36,26 @@
 
 .main-navigation {
   display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.nav-row {
+  display: flex;
   gap: 15px;
   justify-content: center;
-  margin-top: 20px;
   flex-wrap: wrap;
+  width: 100%;
+}
+
+.nav-row-primary {
+  /* 第一行：Birds 和 Butterflies */
+}
+
+.nav-row-secondary {
+  /* 第二行：其他按钮 */
 }
 
 .nav-btn {
