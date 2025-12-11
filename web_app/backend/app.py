@@ -697,12 +697,12 @@ def is_cartoon_or_illustration(image_path):
             gradient_magnitude = np.sqrt(grad_x**2 + grad_y**2)
             avg_gradient = np.mean(gradient_magnitude)
             
-            # Cartoon detection criteria (more sensitive thresholds):
-            # - High edge density (>0.10) AND low texture variance (<30) = cartoon
-            # - High saturation (>0.5) AND low color diversity (<0.4) = cartoon
-            # - High average gradient (>40) AND low texture variance (<30) = cartoon
-            # - Very high saturation (>0.7) = likely cartoon
-            # - Very low texture variance (<15) = likely cartoon
+            # Cartoon detection criteria (more conservative thresholds to avoid false positives):
+            # - High edge density (>0.15) AND low texture variance (<20) = cartoon
+            # - High saturation (>0.65) AND low color diversity (<0.3) = cartoon
+            # - High average gradient (>50) AND low texture variance (<20) = cartoon
+            # - Very high saturation (>0.85) = likely cartoon
+            # - Very low texture variance (<10) = likely cartoon
             is_cartoon = False
             
             # Debug info (can be removed in production)
@@ -710,48 +710,48 @@ def is_cartoon_or_illustration(image_path):
                   f"saturation={saturation:.3f}, color_diversity={color_diversity:.3f}, avg_gradient={avg_gradient:.2f}, "
                   f"hist_peaks={avg_peaks:.1f}")
             
-            # Criterion 1: Sharp edges + uniform texture (lowered thresholds)
-            if edge_density > 0.10 and texture_variance < 30:
+            # Criterion 1: Sharp edges + uniform texture (more conservative)
+            if edge_density > 0.15 and texture_variance < 20:
                 is_cartoon = True
                 print("  -> Detected by: Sharp edges + uniform texture")
             
-            # Criterion 2: High saturation + few colors (lowered thresholds)
-            if saturation > 0.5 and color_diversity < 0.4:
+            # Criterion 2: High saturation + few colors (more conservative)
+            if saturation > 0.65 and color_diversity < 0.3:
                 is_cartoon = True
                 print("  -> Detected by: High saturation + few colors")
             
-            # Criterion 3: High gradient + low texture (lowered thresholds)
-            if avg_gradient > 40 and texture_variance < 30:
+            # Criterion 3: High gradient + low texture (more conservative)
+            if avg_gradient > 50 and texture_variance < 20:
                 is_cartoon = True
                 print("  -> Detected by: High gradient + low texture")
             
-            # Criterion 4: Very high edge density (typical of line art) (lowered threshold)
-            if edge_density > 0.20:
+            # Criterion 4: Very high edge density (typical of line art) (more conservative)
+            if edge_density > 0.30:
                 is_cartoon = True
                 print("  -> Detected by: Very high edge density")
             
-            # Criterion 5: Very high saturation (typical of cartoon colors)
-            if saturation > 0.7:
+            # Criterion 5: Very high saturation (typical of cartoon colors) (more conservative)
+            if saturation > 0.85:
                 is_cartoon = True
                 print("  -> Detected by: Very high saturation")
             
-            # Criterion 6: Very low texture variance (flat colors typical of cartoons)
-            if texture_variance < 15:
+            # Criterion 6: Very low texture variance (flat colors typical of cartoons) (more conservative)
+            if texture_variance < 10:
                 is_cartoon = True
                 print("  -> Detected by: Very low texture variance")
             
-            # Criterion 7: Low color diversity (cartoons use limited color palette)
-            if color_diversity < 0.2:
+            # Criterion 7: Low color diversity (cartoons use limited color palette) (more conservative)
+            if color_diversity < 0.15:
                 is_cartoon = True
                 print("  -> Detected by: Very low color diversity")
             
-            # Criterion 8: Cartoon-like histogram (few distinct color peaks)
-            if has_cartoon_histogram and saturation > 0.5:
+            # Criterion 8: Cartoon-like histogram (few distinct color peaks) (more conservative)
+            if has_cartoon_histogram and saturation > 0.65:
                 is_cartoon = True
                 print("  -> Detected by: Cartoon-like histogram + high saturation")
             
-            # Criterion 9: Very high saturation with low texture (typical cartoon combination)
-            if saturation > 0.75 and texture_variance < 20:
+            # Criterion 9: Very high saturation with low texture (typical cartoon combination) (more conservative)
+            if saturation > 0.85 and texture_variance < 15:
                 is_cartoon = True
                 print("  -> Detected by: Very high saturation + low texture")
             
@@ -773,13 +773,13 @@ def is_cartoon_or_illustration(image_path):
             print(f"Cartoon detection (fallback): texture_variance={texture_variance:.2f}, saturation={saturation:.3f}")
             
             # Simple heuristic: low texture variance + high saturation = likely cartoon
-            # More sensitive thresholds for fallback method
-            if texture_variance < 30 and saturation > 0.5:
+            # More conservative thresholds for fallback method to avoid false positives
+            if texture_variance < 20 and saturation > 0.65:
                 print("  -> Detected by: Low texture + high saturation")
                 return True
             
-            # Also check for very high saturation or very low texture
-            if saturation > 0.7 or texture_variance < 15:
+            # Also check for very high saturation or very low texture (more conservative)
+            if saturation > 0.85 or texture_variance < 10:
                 print("  -> Detected by: Very high saturation or very low texture")
                 return True
             
@@ -959,9 +959,9 @@ def analyze_image_quality(image_path):
 def index():
     """Health check endpoint - Must respond quickly for Koyeb health checks"""
     try:
-        return jsonify({
-            'status': 'success',
-            'message': 'Butterfly and Bird Identification API is running',
+    return jsonify({
+        'status': 'success',
+        'message': 'Butterfly and Bird Identification API is running',
             'model_loaded': model is not None,
             'bird_sound_model_loaded': bird_sound_model is not None
         }), 200
@@ -1173,7 +1173,7 @@ def predict():
         tf.keras.backend.clear_session()
         # Force garbage collection multiple times to ensure memory is freed
         for _ in range(2):
-            gc.collect()
+        gc.collect()
         
         # Debug: Log similar species before returning
         print(f"Returning {len(similar_species)} similar species")
@@ -2595,7 +2595,7 @@ def calculate_match_score(description, species_info):
                 
                 # Also check for general keywords in distribution (only if no location matches)
                 if field_match_count == 0:
-                    for keyword in keywords:
+            for keyword in keywords:
                         # Skip ambiguous words that could cause false matches
                         if keyword.lower() in ['central', 'west', 'east', 'north', 'south', 'western', 'eastern', 
                                              'northern', 'southern']:
@@ -2603,7 +2603,7 @@ def calculate_match_score(description, species_info):
                         # Use word boundary for exact word matching (not substring)
                         pattern = r'\b' + re.escape(keyword) + r'\b'
                         if re.search(pattern, field_text, re.IGNORECASE):
-                            field_match_count += 1
+                    field_match_count += 1
                             matched_keywords_list.append(keyword)
             else:
                 # For other fields, use word boundary matching for better accuracy
@@ -3381,7 +3381,7 @@ if __name__ == '__main__':
     
     try:
         print("Loading image identification model...")
-        load_model()
+    load_model()
         print("Loading bird sound model...")
         load_bird_sound_model()
         
