@@ -2655,7 +2655,7 @@ def calculate_match_score(description, species_info):
                 
                 # Also check for general keywords in distribution (only if no location matches)
                 if field_match_count == 0:
-            for keyword in keywords:
+                    for keyword in keywords:
                         # Skip ambiguous words that could cause false matches
                         if keyword.lower() in ['central', 'west', 'east', 'north', 'south', 'western', 'eastern', 
                                              'northern', 'southern']:
@@ -2663,7 +2663,7 @@ def calculate_match_score(description, species_info):
                         # Use word boundary for exact word matching (not substring)
                         pattern = r'\b' + re.escape(keyword) + r'\b'
                         if re.search(pattern, field_text, re.IGNORECASE):
-                    field_match_count += 1
+                            field_match_count += 1
                             matched_keywords_list.append(keyword)
                 else:
                     # For other fields, use word boundary matching for better accuracy
