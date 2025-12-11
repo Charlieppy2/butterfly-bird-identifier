@@ -449,26 +449,32 @@ def load_bird_sound_model():
         parent = os.path.dirname(working_dir)
         if os.path.basename(parent) == 'web_app':
             project_root = os.path.dirname(parent)
-            test_path = os.path.join(project_root, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
-            if os.path.exists(test_path):
+            # Check for both model.h5 (new) and bird_sound_model.h5 (legacy)
+            test_path1 = os.path.join(project_root, 'models', 'trained', 'bird_sound', 'model.h5')
+            test_path2 = os.path.join(project_root, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
+            if os.path.exists(test_path1) or os.path.exists(test_path2):
                 possible_base_dirs.append(project_root)
     
     # Check if models exist in working directory
-    test_path = os.path.join(working_dir, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
-    if os.path.exists(test_path):
+    test_path1 = os.path.join(working_dir, 'models', 'trained', 'bird_sound', 'model.h5')
+    test_path2 = os.path.join(working_dir, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
+    if os.path.exists(test_path1) or os.path.exists(test_path2):
         possible_base_dirs.append(working_dir)
     
     # Check relative to current file location
     file_based_root = os.path.dirname(os.path.dirname(current_dir))
-    test_path = os.path.join(file_based_root, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
-    if os.path.exists(test_path):
+    test_path1 = os.path.join(file_based_root, 'models', 'trained', 'bird_sound', 'model.h5')
+    test_path2 = os.path.join(file_based_root, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
+    if os.path.exists(test_path1) or os.path.exists(test_path2):
         possible_base_dirs.append(file_based_root)
     
     base_dir = None
     for possible_dir in possible_base_dirs:
         if possible_dir and os.path.exists(possible_dir):
-            test_path = os.path.join(possible_dir, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
-            if os.path.exists(test_path):
+            # Check for both model filenames
+            test_path1 = os.path.join(possible_dir, 'models', 'trained', 'bird_sound', 'model.h5')
+            test_path2 = os.path.join(possible_dir, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
+            if os.path.exists(test_path1) or os.path.exists(test_path2):
                 base_dir = possible_dir
                 break
     
@@ -478,7 +484,11 @@ def load_bird_sound_model():
         bird_sound_class_names = []
         return
     
-    model_path = os.path.join(base_dir, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
+    # Try to load model.h5 first (new format), then fallback to bird_sound_model.h5 (legacy)
+    model_path = os.path.join(base_dir, 'models', 'trained', 'bird_sound', 'model.h5')
+    if not os.path.exists(model_path):
+        model_path = os.path.join(base_dir, 'models', 'trained', 'bird_sound', 'bird_sound_model.h5')
+    
     class_names_path = os.path.join(base_dir, 'models', 'trained', 'bird_sound', 'class_names.json')
     
     if os.path.exists(model_path):
@@ -497,6 +507,7 @@ def load_bird_sound_model():
             with open(class_names_path, 'r', encoding='utf-8') as f:
                 bird_sound_class_names = json.load(f)
             print(f"✅ Bird sound class names loaded: {len(bird_sound_class_names)} classes")
+            print(f"   Classes: {', '.join(bird_sound_class_names[:5])}{'...' if len(bird_sound_class_names) > 5 else ''}")
         except Exception as e:
             print(f"❌ Error loading bird sound class names: {e}")
             bird_sound_class_names = []
@@ -1563,6 +1574,36 @@ def predict_sound():
         else:
             predicted_class = f"Class_{predicted_class_idx}"
         
+        # Find Background class index for additional checking
+        background_idx = None
+        background_confidence = 0.0
+        if bird_sound_class_names:
+            for idx, class_name in enumerate(bird_sound_class_names):
+                if class_name.strip().lower() == 'background':
+                    background_idx = idx
+                    background_confidence = float(predictions[0][idx])
+                    break
+        
+        # Check if prediction is "Background" (non-bird sound)
+        # Handle both "Background" and "Background " (with trailing space)
+        is_background = predicted_class.strip().lower() == 'background'
+        
+        # Also check if Background has high confidence even if not the top prediction
+        # This helps catch cases where model is uncertain between bird and background
+        background_is_strong_contender = False
+        if not is_background and background_idx is not None:
+            # If Background confidence is high (>0.3) and close to top prediction (>70% of top confidence)
+            # It might be ambiguous - could be background noise
+            if background_confidence > 0.3 and background_confidence > confidence * 0.7:
+                background_is_strong_contender = True
+                # If Background confidence is actually higher, use it as the prediction
+                if background_confidence > confidence:
+                    is_background = True
+                    predicted_class = "Background"
+                    confidence = background_confidence
+        
+        is_bird_sound = not is_background
+        
         # Get top 3 predictions
         top_indices = np.argsort(predictions[0])[-3:][::-1]
         top_predictions = []
@@ -1576,6 +1617,19 @@ def predict_sound():
                 'confidence': float(predictions[0][idx])
             })
         
+        # Prepare response message
+        message = None
+        if is_background:
+            if confidence > 0.5:  # High confidence it's background noise
+                message = "检测到的声音似乎不是鸟类叫声，可能是背景噪音或其他声音。请尝试上传清晰的鸟类叫声录音。"
+            else:  # Low confidence - might be ambiguous
+                message = "检测结果不确定，可能是背景噪音。如果这是鸟类叫声，请尝试上传更清晰的录音。"
+        elif background_is_strong_contender:
+            # Top prediction is a bird, but Background is also a strong contender
+            message = f"识别为 {predicted_class}，但模型也检测到较高的背景噪音可能性。如果识别不准确，请尝试上传更清晰的鸟类叫声录音。"
+        elif confidence < 0.3:  # Low confidence for any bird species
+            message = "识别置信度较低。请确保上传的是清晰的鸟类叫声录音。"
+        
         # Clean up uploaded file
         try:
             os.remove(filepath)
@@ -1587,7 +1641,9 @@ def predict_sound():
             'prediction': {
                 'class': predicted_class,
                 'confidence': confidence,
-                'top_predictions': top_predictions
+                'top_predictions': top_predictions,
+                'is_bird_sound': is_bird_sound,
+                'message': message
             }
         })
     
