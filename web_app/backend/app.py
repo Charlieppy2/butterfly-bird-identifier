@@ -1148,9 +1148,12 @@ def predict():
         # 方法2: 計算前3個預測的總置信度，如果都很低，更可能是非目標圖片
         is_likely_not_target = is_likely_not_target or top3_total_confidence < 0.50
         
-        # 如果置信度很低（<30%），嘗試使用通用模型識別
-        if confidence < LOW_CONFIDENCE_THRESHOLD and general_model is not None and not is_cartoon:
-            print("🔄 Low confidence in butterfly/bird model, trying general image recognition...")
+        # 如果置信度很低（<30%）或中等置信度（30-80%），嘗試使用通用模型識別進行驗證
+        # 這樣可以捕獲誤識別的情況（如人被識別為鳥類）
+        should_use_general_model = (confidence < LOW_CONFIDENCE_THRESHOLD) or (0.30 <= confidence < 0.80)
+        
+        if should_use_general_model and general_model is not None and not is_cartoon:
+            print(f"🔄 Verifying with general model (confidence: {confidence:.2%})...")
             try:
                 # Preprocess for ImageNet
                 imagenet_image = preprocess_image_for_imagenet(filepath)
@@ -1160,13 +1163,40 @@ def predict():
                     general_results = decode_imagenet_predictions(general_predictions, top=3)
                     
                     if general_results and len(general_results) > 0:
-                        general_prediction = {
-                            'class': general_results[0]['class'],
-                            'confidence': general_results[0]['confidence'],
-                            'top_predictions': general_results
-                        }
-                        print(f"✅ General model identified: {general_prediction['class']} ({general_prediction['confidence']:.2%})")
-                        is_likely_not_target = True  # Mark as non-butterfly/bird
+                        general_top_class = general_results[0]['class'].lower()
+                        general_confidence = general_results[0]['confidence']
+                        
+                        # 檢查通用模型識別出的類別是否明顯不是鳥類/蝴蝶
+                        # 定義明顯不是目標類別的關鍵詞
+                        non_target_keywords = [
+                            'person', 'people', 'human', 'man', 'woman', 'child', 'adult',
+                            'table', 'chair', 'furniture', 'desk', 'room', 'indoor',
+                            'car', 'vehicle', 'building', 'house', 'street', 'road',
+                            'dog', 'cat', 'pet', 'animal', 'mammal',
+                            'food', 'dish', 'meal', 'plate', 'cup', 'bottle',
+                            'phone', 'computer', 'screen', 'device', 'electronic'
+                        ]
+                        
+                        # 如果通用模型識別出明顯不是鳥類/蝴蝶的類別，且置信度較高
+                        is_non_target = any(keyword in general_top_class for keyword in non_target_keywords)
+                        
+                        if is_non_target and general_confidence > 0.50:
+                            general_prediction = {
+                                'class': general_results[0]['class'],
+                                'confidence': general_confidence,
+                                'top_predictions': general_results
+                            }
+                            print(f"✅ General model identified non-target: {general_prediction['class']} ({general_prediction['confidence']:.2%})")
+                            is_likely_not_target = True  # Mark as non-butterfly/bird
+                        elif confidence < LOW_CONFIDENCE_THRESHOLD:
+                            # 即使不是明顯的非目標類別，如果置信度很低，也使用通用識別結果
+                            general_prediction = {
+                                'class': general_results[0]['class'],
+                                'confidence': general_confidence,
+                                'top_predictions': general_results
+                            }
+                            print(f"✅ General model identified: {general_prediction['class']} ({general_prediction['confidence']:.2%})")
+                            is_likely_not_target = True
             except Exception as e:
                 print(f"⚠️ Error in general model prediction: {e}")
         
