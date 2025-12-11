@@ -1970,17 +1970,18 @@ function App() {
     
     setFeedbackSubmitting(true);
     
+    // 定義 feedbackData 在函數作用域內，這樣 catch 塊也能訪問
+    const feedbackData = {
+      prediction_id: Date.now(), // 使用時間戳作為ID
+      predicted_species: prediction.class,
+      predicted_confidence: prediction.confidence,
+      feedback_type: feedbackType, // 'correct' or 'incorrect'
+      correct_species: correctSpecies || (feedbackType === 'correct' ? prediction.class : null),
+      timestamp: new Date().toISOString(),
+      image_path: preview // 圖片預覽URL
+    };
+    
     try {
-      const feedbackData = {
-        prediction_id: Date.now(), // 使用時間戳作為ID
-        predicted_species: prediction.class,
-        predicted_confidence: prediction.confidence,
-        feedback_type: feedbackType, // 'correct' or 'incorrect'
-        correct_species: correctSpecies || (feedbackType === 'correct' ? prediction.class : null),
-        timestamp: new Date().toISOString(),
-        image_path: preview // 圖片預覽URL
-      };
-      
       const response = await axios.post(`${API_URL}/api/feedback`, feedbackData, {
         timeout: 10000
       });
